@@ -5,33 +5,35 @@ import { Label } from '../ui/label';
 import type { NodeProps } from '@xyflow/react';
 import type { VaultNodeData } from '../../types/nodes';
 
-export const VaultNode: React.FC<NodeProps<VaultNodeData>> = ({ data, selected }) => {
+export const VaultNode: React.FC<NodeProps> = ({ data, selected }) => {
+  const nodeData = data as VaultNodeData;
+  
   return (
-    <BaseNode data={data} selected={selected}>
+    <BaseNode data={nodeData} selected={selected}>
       <div className="space-y-3">
         {/* Action Type */}
         <div>
           <Label className="text-xs text-muted-foreground">Action</Label>
           <Badge variant="outline" className="ml-2 text-xs">
-            {data.action || 'Not set'}
+            {nodeData.action || 'Not set'}
           </Badge>
         </div>
 
         {/* Vault Address */}
-        {data.vaultAddress && (
+        {nodeData.vaultAddress && (
           <div>
             <Label className="text-xs text-muted-foreground">Vault</Label>
             <div className="text-xs font-mono bg-muted p-1 rounded text-muted-foreground">
-              {data.vaultAddress.slice(0, 10)}...{data.vaultAddress.slice(-8)}
+              {nodeData.vaultAddress.slice(0, 10)}...{nodeData.vaultAddress.slice(-8)}
             </div>
           </div>
         )}
 
         {/* Amount */}
-        {data.amount && (
+        {nodeData.amount && (
           <div>
             <Label className="text-xs text-muted-foreground">Amount</Label>
-            <div className="text-sm font-medium">{data.amount}</div>
+            <div className="text-sm font-medium">{nodeData.amount}</div>
           </div>
         )}
 

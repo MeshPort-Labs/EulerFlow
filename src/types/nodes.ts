@@ -1,7 +1,7 @@
-import type { Node } from '@xyflow/react';
-
+// Node category definitions
 export type NodeCategory = 'vault' | 'swap' | 'automation' | 'strategy';
 
+// Base node configuration
 export interface BaseNodeData {
   label: string;
   category: NodeCategory;
@@ -9,6 +9,7 @@ export interface BaseNodeData {
   [key: string]: unknown;
 }
 
+// Specific node data types
 export interface VaultNodeData extends BaseNodeData {
   category: 'vault';
   vaultAddress?: string;
@@ -25,12 +26,4 @@ export interface SwapNodeData extends BaseNodeData {
 }
 
 // Union type for all node data
-export type NodeData = VaultNodeData | SwapNodeData;
-
-// Node type definitions for React Flow
-export type VaultNode = Node<VaultNodeData>;
-export type SwapNode = Node<SwapNodeData>;
-export type StartNode = Node<BaseNodeData>;
-export type EndNode = Node<BaseNodeData>;
-
-export type CustomNode = VaultNode | SwapNode | StartNode | EndNode;
+export type NodeData = VaultNodeData | SwapNodeData | BaseNodeData;
