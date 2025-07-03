@@ -1,9 +1,11 @@
+// src/components/PropertyPanel/PropertyPanel.tsx
 import React from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
-import { VaultNodeProperties } from './VaultNodeProperties';
-import { SwapNodeProperties } from './SwapNodeProperties';
 import { GeneralNodeProperties } from './GeneralNodeProperties';
+import { CoreActionNodeProperties } from './CoreActionNodeProperties';
+import { LpToolkitNodeProperties } from './LpToolkitNodeProperties';
+import { StrategyNodeProperties } from './StrategyNodeProperties';
 import type { Node } from '@xyflow/react';
 import type { NodeData } from '../../types/nodes';
 
@@ -32,12 +34,24 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
 
   const renderNodeSpecificProperties = () => {
     switch (nodeData.category) {
-      case 'vault':
-        return <VaultNodeProperties data={nodeData} onUpdate={handleUpdate} />;
-      case 'swap':
-        return <SwapNodeProperties data={nodeData} onUpdate={handleUpdate} />;
+      case 'core':
+        return <CoreActionNodeProperties data={nodeData} onUpdate={handleUpdate} />;
+      case 'lp-toolkit':
+        return <LpToolkitNodeProperties data={nodeData} onUpdate={handleUpdate} />;
+      case 'strategy':
+        return <StrategyNodeProperties data={nodeData} onUpdate={handleUpdate} />;
       default:
         return <div className="text-muted-foreground text-sm">No specific properties available.</div>;
+    }
+  };
+
+  const getCategoryColor = (category: string) => {
+    switch (category) {
+      case 'core': return '#3b82f6';
+      case 'lp-toolkit': return '#22c55e';
+      case 'strategy': return '#8b5cf6';
+      case 'control': return '#6b7280';
+      default: return '#6b7280';
     }
   };
 
@@ -48,10 +62,7 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
           <SheetTitle className="flex items-center gap-2">
             <div 
               className="w-3 h-3 rounded-full"
-              style={{ 
-                backgroundColor: nodeData.category === 'vault' ? '#3b82f6' : 
-                                nodeData.category === 'swap' ? '#22c55e' : '#6b7280'
-              }}
+              style={{ backgroundColor: getCategoryColor(nodeData.category) }}
             />
             {nodeData.label}
           </SheetTitle>

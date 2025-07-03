@@ -1,4 +1,5 @@
 export { PropertyPanel } from './PropertyPanel';
-export { VaultNodeProperties } from './VaultNodeProperties';
-export { SwapNodeProperties } from './SwapNodeProperties';
+export { CoreActionNodeProperties } from './CoreActionNodeProperties';
+export { LpToolkitNodeProperties } from './LpToolkitNodeProperties';
+export { StrategyNodeProperties } from './StrategyNodeProperties';
 export { GeneralNodeProperties } from './GeneralNodeProperties';

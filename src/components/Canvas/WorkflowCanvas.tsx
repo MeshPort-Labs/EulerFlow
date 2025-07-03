@@ -20,9 +20,8 @@ import { nodeTypes } from '../nodes';
 import { PropertyPanel } from '../PropertyPanel';
 import { StatusBar } from '../StatusBar/StatusBar';
 import type { WorkflowNode, WorkflowEdge } from '../../types/workflow';
-import type { NodeData } from '../../types/nodes';
+import type { NodeData, CoreActionNodeData, StrategyNodeData, LpToolkitNodeData } from '../../types/nodes';
 
-// Convert our types to React Flow types
 const convertToReactFlowNode = (node: WorkflowNode): Node => ({
   id: node.id,
   type: node.type,
@@ -38,44 +37,67 @@ const convertToReactFlowEdge = (edge: WorkflowEdge): Edge => ({
   targetHandle: edge.targetHandle,
 });
 
-// Initial sample nodes for testing
 const initialNodes: WorkflowNode[] = [
   {
     id: '1',
     type: 'startNode',
     position: { x: 100, y: 100 },
-    data: { label: 'Start', category: 'vault' as const },
+    data: { 
+      label: 'Start', 
+      category: 'control' as const, 
+      controlType: 'start' as const 
+    },
   },
   {
     id: '2',
-    type: 'vaultNode',
-    position: { x: 300, y: 150 },
+    type: 'coreActionNode',
+    position: { x: 400, y: 10 },
     data: { 
-      label: 'USDC Deposit', 
-      category: 'vault' as const,
-      action: 'deposit' as const,
-      description: 'Deposit USDC to vault',
-      amount: '1000 USDC'
+      label: 'Supply USDC', 
+      category: 'core' as const,
+      action: 'supply' as const,
+      description: 'Supply USDC to vault',
+      amount: '1000',
+      vaultAddress: '0x1234...5678'
     },
   },
   {
     id: '3',
-    type: 'swapNode',
-    position: { x: 500, y: 150 },
+    type: 'strategyNode',
+    position: { x: 800, y: 5 },
     data: { 
-      label: 'USDC → WETH', 
-      category: 'swap' as const,
-      description: 'Swap USDC for WETH',
-      tokenIn: 'USDC',
-      tokenOut: 'WETH',
-      amountIn: '1000'
+      label: '3x Leverage WETH', 
+      category: 'strategy' as const,
+      strategyType: 'leverage' as const,
+      description: 'Build 3x leveraged WETH position',
+      collateralAsset: 'WETH',
+      borrowAsset: 'USDC',
+      leverageFactor: 3
     },
   },
   {
     id: '4',
+    type: 'lpToolkitNode',
+    position: { x: 800, y: 400 },
+    data: { 
+      label: 'Create USDC/WETH Pool', 
+      category: 'lp-toolkit' as const,
+      action: 'create-pool' as const,
+      description: 'Create new liquidity pool',
+      vault0: '0x1234...5678',
+      vault1: '0x2345...6789',
+      fee: '0.3'
+    },
+  },
+  {
+    id: '5',
     type: 'endNode',
-    position: { x: 700, y: 100 },
-    data: { label: 'End', category: 'vault' as const },
+    position: { x: 1200, y: 150 },
+    data: { 
+      label: 'End', 
+      category: 'control' as const, 
+      controlType: 'end' as const 
+    },
   },
 ];
 
@@ -91,8 +113,13 @@ const initialEdges: WorkflowEdge[] = [
     target: '3',
   },
   {
-    id: 'e3-4',
+    id: 'e3-5',
     source: '3',
+    target: '5',
+  },
+  {
+    id: 'e2-4',
+    source: '2',
     target: '4',
   },
 ];
@@ -138,18 +165,62 @@ const WorkflowCanvasInner: React.FC<WorkflowCanvasProps> = ({ onWorkflowStateCha
     onChange: onSelectionChange,
   });
 
-  // Validate workflow
+  // Updated validation for new node structure
   const isWorkflowValid = useMemo(() => {
-    // Check if all nodes have required configuration
     return nodes.every(node => {
       const data = node.data as NodeData;
-      if (data.category === 'vault') {
-        return data.vaultAddress && data.amount && data.action;
+      
+      switch (data.category) {
+        case 'core':
+          const coreData = data as CoreActionNodeData;
+          switch (coreData.action) {
+            case 'supply':
+            case 'withdraw':
+            case 'borrow':
+            case 'repay':
+              return coreData.vaultAddress && coreData.amount;
+            case 'swap':
+              return coreData.tokenIn && coreData.tokenOut && coreData.amount;
+            case 'permissions':
+              return coreData.collaterals?.length || coreData.controller;
+            default:
+              return false;
+          }
+        
+        case 'strategy':
+          const strategyData = data as StrategyNodeData;
+          switch (strategyData.strategyType) {
+            case 'leverage':
+              return strategyData.collateralAsset && strategyData.borrowAsset && strategyData.leverageFactor;
+            case 'borrow-against-lp':
+              return strategyData.borrowAsset && strategyData.borrowAmount;
+            case 'hedged-lp':
+              return strategyData.collateralAsset && strategyData.borrowAsset;
+            case 'jit-liquidity':
+              return strategyData.jitAsset && strategyData.jitAmount && strategyData.jitAction;
+            default:
+              return false;
+          }
+        
+        case 'lp-toolkit':
+          const lpData = data as LpToolkitNodeData;
+          switch (lpData.action) {
+            case 'create-pool':
+              return lpData.vault0 && lpData.vault1;
+            case 'add-liquidity':
+            case 'remove-liquidity':
+              return lpData.amount0 && lpData.amount1;
+            default:
+              return false;
+          }
+        
+        case 'control':
+          return true; // Control nodes are always valid
+        
+        
+        default:
+          return true;
       }
-      if (data.category === 'swap') {
-        return data.tokenIn && data.tokenOut && data.amountIn;
-      }
-      return true; // Start and end nodes are always valid
     });
   }, [nodes]);
 
@@ -206,10 +277,7 @@ const WorkflowCanvasInner: React.FC<WorkflowCanvasProps> = ({ onWorkflowStateCha
         type: nodeTemplate.type,
         position,
         data: {
-          label: nodeTemplate.label,
-          category: nodeTemplate.category,
-          description: nodeTemplate.description,
-          ...(nodeTemplate.category === 'vault' && { action: 'deposit' }),
+          ...nodeTemplate.data,
         },
       };
 
@@ -230,7 +298,7 @@ const WorkflowCanvasInner: React.FC<WorkflowCanvasProps> = ({ onWorkflowStateCha
           onDrop={onDrop}
           onDragOver={onDragOver}
           nodeTypes={nodeTypes}
-          fitView
+          // fitView
           className="bg-background"
         >
           <Background className="opacity-25" />
@@ -239,10 +307,12 @@ const WorkflowCanvasInner: React.FC<WorkflowCanvasProps> = ({ onWorkflowStateCha
             className="bg-card shadow-lg border" 
             nodeColor={(node) => {
               switch (node.type) {
-                case 'vaultNode': return '#3b82f6';
-                case 'swapNode': return '#22c55e';
-                case 'startNode': return '#10b981';
-                case 'endNode': return '#ef4444';
+                case 'coreActionNode': return '#3b82f6';     // Blue
+                case 'strategyNode': return '#8b5cf6';       // Purple
+                case 'lpToolkitNode': return '#22c55e';      // Green 
+                case 'startNode': return '#10b981';          // Emerald
+                case 'endNode': return '#ef4444';            // Red
+                
                 default: return '#6b7280';
               }
             }}
@@ -268,7 +338,6 @@ const WorkflowCanvasInner: React.FC<WorkflowCanvasProps> = ({ onWorkflowStateCha
   );
 };
 
-// Outer component that provides ReactFlow context
 export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = (props) => {
   return (
     <ReactFlowProvider>

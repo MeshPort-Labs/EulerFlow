@@ -15,7 +15,10 @@ const categoryColors = {
   vault: 'bg-blue-500',
   swap: 'bg-green-500',
   automation: 'bg-purple-500',
-  strategy: 'bg-orange-500',
+  strategy: 'bg-purple-500',
+  core: 'bg-blue-500',
+  'lp-toolkit': 'bg-green-500',
+  control: 'bg-gray-500',
 };
 
 export const BaseNode: React.FC<BaseNodeProps> = ({ data, selected, children }) => {

@@ -1,14 +1,26 @@
-import { VaultNode } from './VaultNode';
-import { SwapNode } from './SwapNode';
+// src/components/nodes/index.ts
 import { StartNode } from './StartNode';
 import { EndNode } from './EndNode';
+import { CoreActionNode } from './CoreActions';
+import { LpToolkitNode } from './LpToolkit';
+import { StrategyNode } from './Strategies';
 import type { NodeTypes } from '@xyflow/react';
 
 export const nodeTypes: NodeTypes = {
-  vaultNode: VaultNode,
-  swapNode: SwapNode,
+  // Control nodes
   startNode: StartNode,
   endNode: EndNode,
+  
+  // New modular nodes
+  coreActionNode: CoreActionNode,
+  lpToolkitNode: LpToolkitNode,
+  strategyNode: StrategyNode,
 };
 
-export { VaultNode, SwapNode, StartNode, EndNode };
+export { 
+  StartNode, 
+  EndNode, 
+  CoreActionNode,
+  LpToolkitNode,
+  StrategyNode
+};
