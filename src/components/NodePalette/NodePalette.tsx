@@ -14,14 +14,17 @@ import {
   Layers,
   Coins,
   TrendingUp,
-  BarChart3
+  BarChart3,
+  MessageSquare,
+  MessageCircle,
+  Bell
 } from 'lucide-react';
 
 interface NodeTemplate {
   id: string;
   type: string;
   label: string;
-  category: 'core' | 'lp-toolkit' | 'strategy' | 'control' | 'vault' | 'swap'; // Updated categories + legacy support
+  category: 'core' | 'lp-toolkit' | 'strategy' | 'control' | 'vault' | 'swap' | 'alert'; // Updated categories + legacy support
   description: string;
   icon: React.ReactNode;
   defaultData?: Record<string, any>; // New field for default node data
@@ -168,6 +171,26 @@ const nodeTemplates: NodeTemplate[] = [
     icon: <Zap className="w-4 h-4" />,
     defaultData: { strategyType: 'jit-liquidity' }
   },
+
+  // Alert Nodes
+  {
+    id: 'telegram-alert',
+    type: 'alertNode',
+    label: 'Telegram Alert',
+    category: 'alert',
+    description: 'Send notification to Telegram',
+    icon: <MessageCircle className="w-4 h-4" />,
+    defaultData: { alertType: 'telegram' }
+  },
+  {
+    id: 'discord-alert',
+    type: 'alertNode',
+    label: 'Discord Alert',
+    category: 'alert',
+    description: 'Send notification to Discord',
+    icon: <MessageSquare className="w-4 h-4" />,
+    defaultData: { alertType: 'discord' }
+  },
 ];
 
 const categoryIcons = {
@@ -175,6 +198,7 @@ const categoryIcons = {
   core: <Database className="w-4 h-4" />,
   'lp-toolkit': <Layers className="w-4 h-4" />,
   strategy: <Target className="w-4 h-4" />,
+  alert: <Bell className="w-4 h-4" />,
 };
 
 const categoryColors = {
@@ -182,6 +206,7 @@ const categoryColors = {
   core: 'bg-blue-100 text-blue-700 border-blue-200',
   'lp-toolkit': 'bg-green-100 text-green-700 border-green-200',
   strategy: 'bg-purple-100 text-purple-700 border-purple-200',
+  alert: 'bg-orange-100 text-orange-700 border-orange-200',
 };
 
 const categoryLabels = {
@@ -189,6 +214,7 @@ const categoryLabels = {
   core: 'Core Actions',
   'lp-toolkit': 'LP Toolkit',
   strategy: 'Strategies',
+  alert: 'Alerts',
 };
 
 interface NodePaletteProps {

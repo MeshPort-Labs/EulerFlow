@@ -1,4 +1,3 @@
-// src/components/nodes/Strategies/StrategyNode.tsx
 import React from 'react';
 import type { NodeProps } from '@xyflow/react';
 import type { StrategyNodeData } from '../../../types/nodes';

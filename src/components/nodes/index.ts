@@ -1,10 +1,10 @@
-// src/components/nodes/index.ts
 import { StartNode } from './StartNode';
 import { EndNode } from './EndNode';
 import { CoreActionNode } from './CoreActions';
 import { LpToolkitNode } from './LpToolkit';
 import { StrategyNode } from './Strategies';
 import type { NodeTypes } from '@xyflow/react';
+import { AlertNode } from './Alerts';
 
 export const nodeTypes: NodeTypes = {
   // Control nodes
@@ -15,6 +15,7 @@ export const nodeTypes: NodeTypes = {
   coreActionNode: CoreActionNode,
   lpToolkitNode: LpToolkitNode,
   strategyNode: StrategyNode,
+  alertNode: AlertNode,
 };
 
 export { 

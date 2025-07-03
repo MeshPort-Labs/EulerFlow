@@ -8,6 +8,7 @@ import { LpToolkitNodeProperties } from './LpToolkitNodeProperties';
 import { StrategyNodeProperties } from './StrategyNodeProperties';
 import type { Node } from '@xyflow/react';
 import type { NodeData } from '../../types/nodes';
+import { AlertNodeProperties } from './AlertNodeProperties';
 
 interface PropertyPanelProps {
   isOpen: boolean;
@@ -40,6 +41,10 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
         return <LpToolkitNodeProperties data={nodeData} onUpdate={handleUpdate} />;
       case 'strategy':
         return <StrategyNodeProperties data={nodeData} onUpdate={handleUpdate} />;
+        case 'alert':
+          return <AlertNodeProperties data={nodeData} onUpdate={handleUpdate} />;
+        case 'control':
+          return <div className="text-muted-foreground text-sm">Control nodes have no configurable properties.</div>;
       default:
         return <div className="text-muted-foreground text-sm">No specific properties available.</div>;
     }
@@ -50,6 +55,7 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
       case 'core': return '#3b82f6';
       case 'lp-toolkit': return '#22c55e';
       case 'strategy': return '#8b5cf6';
+      case 'alert': return '#f59e0b';
       case 'control': return '#6b7280';
       default: return '#6b7280';
     }

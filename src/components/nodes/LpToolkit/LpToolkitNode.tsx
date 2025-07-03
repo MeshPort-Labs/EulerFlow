@@ -1,4 +1,3 @@
-// src/components/nodes/LpToolkit/LpToolkitNode.tsx
 import React from 'react';
 import type { NodeProps } from '@xyflow/react';
 import type { LpToolkitNodeData } from '../../../types/nodes';

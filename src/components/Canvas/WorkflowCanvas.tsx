@@ -286,11 +286,48 @@ const WorkflowCanvasInner: React.FC<WorkflowCanvasProps> = ({ onWorkflowStateCha
     [setNodes]
   );
 
+  // Handle node deletion
+  const handleDeleteNode = useCallback((nodeId: string) => {
+    setNodes((nds) => nds.filter((node) => node.id !== nodeId));
+    setEdges((eds) => eds.filter((edge) => 
+      edge.source !== nodeId && edge.target !== nodeId
+    ));
+    setSelectedNode(null);
+    setIsPanelOpen(false);
+  }, [setNodes, setEdges]);
+
+  // Handle edge deletion
+  const handleDeleteEdge = useCallback((edgeId: string) => {
+    setEdges((eds) => eds.filter((edge) => edge.id !== edgeId));
+  }, [setEdges]);
+
+  // Keyboard event handler
+  const handleKeyDown = useCallback((event: KeyboardEvent) => {
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      if (selectedNode) {
+        handleDeleteNode(selectedNode.id);
+      }
+      // Handle edge deletion if edge is selected (you'll need to add edge selection state)
+    }
+  }, [selectedNode, handleDeleteNode]);
+
+  // Add keyboard event listener
+  useEffect(() => {
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
+
   return (
     <div className="flex flex-col h-full">
       <div ref={reactFlowWrapper} className="flex-1 bg-muted/30">
         <ReactFlow
-          nodes={nodes}
+          nodes={nodes.map(node => ({
+            ...node,
+            data: {
+              ...node.data,
+              onDelete: () => handleDeleteNode(node.id)
+            }
+          }))}
           edges={edges}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
@@ -300,6 +337,7 @@ const WorkflowCanvasInner: React.FC<WorkflowCanvasProps> = ({ onWorkflowStateCha
           nodeTypes={nodeTypes}
           // fitView
           className="bg-background"
+          deleteKeyCode={null}
         >
           <Background className="opacity-25" />
           <Controls className="bg-card shadow-lg border" />

@@ -1,4 +1,4 @@
-export type NodeCategory = 'core' | 'lp-toolkit' | 'strategy' | 'control';
+export type NodeCategory = 'core' | 'lp-toolkit' | 'strategy' | 'control' | 'alert';
 
 // Action types for different categories
 export type CoreActionType = 'supply' | 'withdraw' | 'borrow' | 'repay' | 'swap' | 'permissions';
@@ -64,5 +64,20 @@ export interface StrategyNodeData extends BaseNodeData {
   jitAction?: 'deploy' | 'withdraw';
 }
 
+// Add alert types
+export type AlertActionType = 'telegram' | 'discord';
+
+// Add alert node data interface
+export interface AlertNodeData extends BaseNodeData {
+  category: 'alert';
+  alertType: AlertActionType;
+  recipient?: string;
+  message?: string;
+  triggerCondition?: 'success' | 'failure' | 'always';
+  webhookUrl?: string;
+  chatId?: string;
+  botToken?: string;
+}
+
 // Union type for all node data
-export type NodeData = ControlNodeData | CoreActionNodeData | LpToolkitNodeData | StrategyNodeData;
+export type NodeData = ControlNodeData | CoreActionNodeData | LpToolkitNodeData | StrategyNodeData | AlertNodeData;

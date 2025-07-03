@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import type { Node, Edge } from '@xyflow/react';
-import type { CoreActionNodeData, LpToolkitNodeData, NodeData, StrategyNodeData } from '../types/nodes';
+import type { AlertNodeData, CoreActionNodeData, LpToolkitNodeData, NodeData, StrategyNodeData } from '../types/nodes';
 import { EulerWorkflowExecutor } from '../lib/eulerIntegrations';
 import type { BatchOperation } from '../types/euler';
 
@@ -323,6 +323,28 @@ const validateWorkflow = useCallback((nodes: Node[], edges: Edge[]): { valid: bo
             break;
         }
         break;
+
+        case 'alert':
+          const alertData = data as AlertNodeData;
+          switch (alertData.alertType) {
+            case 'telegram':
+              if (!alertData.botToken) {
+                errors.push(`Telegram alert "${data.label}" missing bot token`);
+              }
+              if (!alertData.chatId) {
+                errors.push(`Telegram alert "${data.label}" missing chat ID`);
+              }
+              break;
+            case 'discord':
+              if (!alertData.webhookUrl) {
+                errors.push(`Discord alert "${data.label}" missing webhook URL`);
+              }
+              break;
+          }
+          if (!alertData.message) {
+            errors.push(`Alert "${data.label}" missing message template`);
+          }
+          break;
 
       case 'control':
         // Control nodes are always valid - no configuration needed
