@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState, useMemo } from 'react';
+import React, { useCallback, useRef, useState, useMemo, useEffect } from 'react';
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -97,8 +97,12 @@ const initialEdges: WorkflowEdge[] = [
   },
 ];
 
+interface WorkflowCanvasProps {
+  onWorkflowStateChange?: (nodes: Node[], edges: Edge[]) => void;
+}
+
 // Inner component that uses React Flow hooks
-const WorkflowCanvasInner: React.FC = () => {
+const WorkflowCanvasInner: React.FC<WorkflowCanvasProps> = ({ onWorkflowStateChange }) => {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState(
     initialNodes.map(convertToReactFlowNode)
@@ -109,6 +113,11 @@ const WorkflowCanvasInner: React.FC = () => {
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [executionStatus, setExecutionStatus] = useState<'idle' | 'running' | 'completed' | 'error'>('idle');
+
+  // Notify parent of state changes
+  useEffect(() => {
+    onWorkflowStateChange?.(nodes, edges);
+  }, [nodes, edges, onWorkflowStateChange]);
 
   // Use the selection change hook (now inside ReactFlow context)
   const onSelectionChange = useCallback(
@@ -260,10 +269,10 @@ const WorkflowCanvasInner: React.FC = () => {
 };
 
 // Outer component that provides ReactFlow context
-export const WorkflowCanvas: React.FC = () => {
+export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = (props) => {
   return (
     <ReactFlowProvider>
-      <WorkflowCanvasInner />
+      <WorkflowCanvasInner {...props} />
     </ReactFlowProvider>
   );
 };
