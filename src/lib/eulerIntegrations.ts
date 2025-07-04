@@ -1,218 +1,159 @@
-// src/lib/eulerIntegrations.ts (Fixed)
+// src/lib/eulerIntegrations.ts
 import type { NodeData, CoreActionNodeData, StrategyNodeData, LpToolkitNodeData } from '../types/nodes';
-import { EulerPrimitives, type BatchOperation } from './euler/primitives';
-import { DEVLAND_ADDRESSES, DEVLAND_USER, getVaultAddress } from './euler/addresses';
-import { EulerStrategies } from './euler/strategies';
+import {
+  executeEVCBatch,
+  supplyToVault,
+  borrowAndSendTo,
+  repayToVault,
+  withdrawFromVault,
+  enableController,
+  createLeverageStrategy,
+  createLpCollateralizationStrategy,
+  createHedgedLpStrategy,
+  createJitDepositStrategy,
+  createJitWithdrawalStrategy,
+} from './euler/eulerLib';
+import { DEVLAND_ADDRESSES } from './euler/addresses';
+import { parseUnits } from 'viem';
+import { useAccount } from 'wagmi';
 
 export class EulerWorkflowExecutor {
-  private static primitives: EulerPrimitives;
-  private static strategies: EulerStrategies;
-  private static initialized = false;
-
-  static async initialize() {
-    if (!this.initialized) {
-      this.primitives = new EulerPrimitives(DEVLAND_ADDRESSES, DEVLAND_USER);
-      this.strategies = new EulerStrategies(DEVLAND_ADDRESSES, DEVLAND_USER);
-      this.initialized = true;
-      console.log('🔧 EulerWorkflowExecutor initialized with devland addresses');
-    }
-  }
-
-  static async executeNodeSequence(nodes: NodeData[]): Promise<BatchOperation[]> {
-    await this.initialize();
-    
-    const operations: BatchOperation[] = [];
+  static async executeNodeSequence(nodes: NodeData[], userAddress: string): Promise<any[]> {
+    const allBatches: any[] = [];
     
     for (const node of nodes) {
-      const nodeOps = await this.nodeToOperations(node);
-      operations.push(...nodeOps);
+      const batches = await this.nodeToEulerLibOperations(node, userAddress);
+      allBatches.push(...batches);
     }
     
-    console.log(`📦 Generated ${operations.length} batch operations from ${nodes.length} nodes`);
-    return operations;
+    return allBatches;
   }
 
-  private static async nodeToOperations(node: NodeData): Promise<BatchOperation[]> {
+  private static async nodeToEulerLibOperations(node: NodeData, userAddress: string): Promise<any[]> {
     switch (node.category) {
       case 'core':
-        return this.handleCoreAction(node as CoreActionNodeData);
+        return this.handleCoreActionWithEulerLib(node as CoreActionNodeData, userAddress);
       case 'strategy':
-        return this.handleStrategy(node as StrategyNodeData);
+        return this.handleStrategyWithEulerLib(node as StrategyNodeData, userAddress);
       case 'lp-toolkit':
-        return this.handleLpToolkit(node as LpToolkitNodeData);
-      case 'control':
-        return []; // Control nodes don't generate operations
+        return this.handleLpToolkitWithEulerLib(node as LpToolkitNodeData, userAddress);
       default:
-        console.warn(`Unknown node category: ${node.category}`);
         return [];
     }
   }
 
-  private static async handleCoreAction(data: CoreActionNodeData): Promise<BatchOperation[]> {
-    console.log(`🔧 Processing core action: ${data.action}`);
-    console.log(`🔧 Node data:`, data);
+  private static async handleCoreActionWithEulerLib(data: CoreActionNodeData, userAddress: string): Promise<any[]> {
+    const amount = parseUnits(data.amount || '0', 6); // Adjust decimals as needed
     
     switch (data.action) {
       case 'supply': {
-        // Check if vaultAddress is properly set
-        if (!data.vaultAddress) {
-          throw new Error(`Supply action missing vault address. Available fields: ${Object.keys(data).join(', ')}`);
-        }
-        
-        // Try to get vault address by symbol first, then use direct address
-        let vaultAddress;
-        try {
-          vaultAddress = getVaultAddress(data.vaultAddress as keyof typeof DEVLAND_ADDRESSES.vaults);
-        } catch (error) {
-          // If not a known symbol, try to use as direct address
-          if (data.vaultAddress.startsWith('0x')) {
-            vaultAddress = data.vaultAddress as `0x${string}`;
-          } else {
-            throw new Error(`Invalid vault address: ${data.vaultAddress}. Must be one of: ${Object.keys(DEVLAND_ADDRESSES.vaults).join(', ')}`);
-          }
-        }
-        
-        const amount = this.parseAmount(data.amount);
-        console.log(`💰 Supply ${amount} to vault ${vaultAddress} (${data.vaultAddress})`);
-        return [this.primitives.supplyToVault(vaultAddress, amount, DEVLAND_USER)];
-      }
-      
-      case 'withdraw': {
-        if (!data.vaultAddress) {
-          throw new Error(`Withdraw action missing vault address`);
-        }
-        const vaultAddress = getVaultAddress(data.vaultAddress as keyof typeof DEVLAND_ADDRESSES.vaults);
-        const amount = this.parseAmount(data.amount);
-        return [this.primitives.withdrawFromVault(vaultAddress, amount, DEVLAND_USER)];
+        const strategy = await supplyToVault(
+          data.vaultAddress as keyof typeof DEVLAND_ADDRESSES.vaults, 
+          amount
+        );
+        return [strategy];
       }
       
       case 'borrow': {
-        if (!data.vaultAddress) {
-          throw new Error(`Borrow action missing vault address`);
-        }
-        const vaultAddress = getVaultAddress(data.vaultAddress as keyof typeof DEVLAND_ADDRESSES.vaults);
-        const amount = this.parseAmount(data.amount);
-        return [this.primitives.borrowFromVault(vaultAddress, amount, DEVLAND_USER)];
+        const strategy = await borrowAndSendTo(
+          data.vaultAddress as keyof typeof DEVLAND_ADDRESSES.vaults,
+          amount,
+          userAddress as any // Send borrowed assets to user's address
+        );
+        return [strategy];
       }
       
       case 'repay': {
-        if (!data.vaultAddress) {
-          throw new Error(`Repay action missing vault address`);
-        }
-        const vaultAddress = getVaultAddress(data.vaultAddress as keyof typeof DEVLAND_ADDRESSES.vaults);
-        const amount = this.parseAmount(data.amount);
-        return [this.primitives.repayToVault(vaultAddress, amount)];
+        const strategy = await repayToVault(
+          data.vaultAddress as keyof typeof DEVLAND_ADDRESSES.vaults,
+          amount
+        );
+        return [strategy];
+      }
+      
+      case 'withdraw': {
+        const strategy = await withdrawFromVault(
+          data.vaultAddress as keyof typeof DEVLAND_ADDRESSES.vaults,
+          amount,
+          userAddress as any // Send withdrawn assets to user's address
+        );
+        return [strategy];
       }
       
       case 'permissions': {
-        const ops: BatchOperation[] = [];
-        
-        // Enable collaterals
-        if (data.collaterals) {
-          data.collaterals.forEach(collateral => {
-            const vaultAddress = getVaultAddress(collateral as keyof typeof DEVLAND_ADDRESSES.vaults);
-            ops.push(this.primitives.enableCollateral(vaultAddress));
-          });
-        }
-        
-        // Enable controller
+        const batches = [];
         if (data.controller) {
-          const vaultAddress = getVaultAddress(data.controller as keyof typeof DEVLAND_ADDRESSES.vaults);
-          ops.push(this.primitives.enableController(vaultAddress));
+          batches.push(enableController(data.controller as keyof typeof DEVLAND_ADDRESSES.vaults));
         }
-        
-        return ops;
-      }
-      
-      case 'swap': {
-        // TODO: Implement swap through EulerSwap
-        console.warn('Swap action not yet implemented');
-        return [];
+        return batches;
       }
       
       default:
-        console.warn(`Unknown core action: ${data.action}`);
         return [];
     }
   }
 
-  private static async handleStrategy(data: StrategyNodeData): Promise<BatchOperation[]> {
-    console.log(`🎯 Processing strategy: ${data.strategyType}`);
+  private static async handleStrategyWithEulerLib(data: StrategyNodeData, userAddress: string): Promise<any[]> {
+    const amount = parseUnits(data.amount as string || '1000', 6);
     
     switch (data.strategyType) {
       case 'leverage': {
-        if (!data.collateralAsset || !data.borrowAsset) {
-          throw new Error('Leverage strategy requires collateralAsset and borrowAsset');
-        }
-        
-        const collateralVault = getVaultAddress(data.collateralAsset as keyof typeof DEVLAND_ADDRESSES.vaults);
-        const borrowVault = getVaultAddress(data.borrowAsset as keyof typeof DEVLAND_ADDRESSES.vaults);
-        const amount = this.parseAmount(data.amount as string | undefined);
-        const leverageFactor = data.leverageFactor || 2;
-        
-        return this.strategies.createLeverageStrategy(
-          collateralVault,
-          borrowVault,
+        const strategy = await createLeverageStrategy(
+          data.collateralAsset as keyof typeof DEVLAND_ADDRESSES.vaults,
           amount,
-          leverageFactor
+          data.borrowAsset as keyof typeof DEVLAND_ADDRESSES.vaults,
+          data.leverageFactor || 2
         );
+        return strategy ? [strategy.supplyMarginBatch, strategy.borrowAndSwapBatch] : [];
       }
       
       case 'borrow-against-lp': {
-        if (!data.collateralAsset || !data.borrowAsset) {
-          throw new Error('Borrow against LP strategy requires collateralAsset and borrowAsset');
-        }
-        
-        const lpVault = getVaultAddress(data.collateralAsset as keyof typeof DEVLAND_ADDRESSES.vaults);
-        const borrowVault = getVaultAddress(data.borrowAsset as keyof typeof DEVLAND_ADDRESSES.vaults);
-        const borrowAmount = this.parseAmount(data.borrowAmount);
-        
-        return this.strategies.createLpCollateralizationStrategy(
-          lpVault,
-          borrowVault,
+        const borrowAmount = parseUnits(data.borrowAmount || '500', 6);
+        const strategy = await createLpCollateralizationStrategy(
+          data.borrowAsset as keyof typeof DEVLAND_ADDRESSES.vaults,
           borrowAmount
         );
+        return strategy ? [strategy] : [];
+      }
+      
+      case 'hedged-lp': {
+        const borrowAmount = parseUnits(data.borrowAmount || '500', 18);
+        const strategy = await createHedgedLpStrategy(
+          data.collateralAsset as keyof typeof DEVLAND_ADDRESSES.vaults,
+          amount,
+          data.borrowAsset as keyof typeof DEVLAND_ADDRESSES.vaults,
+          borrowAmount
+        );
+        return strategy ? [strategy] : [];
+      }
+      
+      case 'jit-liquidity': {
+        const jitAmount = parseUnits(data.jitAmount || '1000', 6);
+        if (data.jitAction === 'deploy') {
+          const strategy = await createJitDepositStrategy(
+            userAddress as any, // Pool address - you'll need to get this properly
+            data.jitAsset as keyof typeof DEVLAND_ADDRESSES.vaults,
+            jitAmount
+          );
+          return strategy ? [strategy] : [];
+        } else {
+          const strategy = await createJitWithdrawalStrategy(
+            userAddress as any, // Pool address
+            data.jitAsset as keyof typeof DEVLAND_ADDRESSES.vaults,
+            jitAmount
+          );
+          return strategy ? [strategy] : [];
+        }
       }
       
       default:
-        console.warn(`Strategy type not implemented: ${data.strategyType}`);
         return [];
     }
   }
 
-  private static async handleLpToolkit(data: LpToolkitNodeData): Promise<BatchOperation[]> {
-    console.log(`🌊 LP toolkit action not yet implemented: ${data.action}`);
+  private static async handleLpToolkitWithEulerLib(data: LpToolkitNodeData, userAddress: string): Promise<any[]> {
+    // LP Toolkit operations would need to be implemented in euler-lib
+    console.log('LP Toolkit operations not yet implemented in euler-lib');
     return [];
-  }
-
-  // Helper to parse amount strings (enhanced)
-  private static parseAmount(amount?: string): bigint {
-    if (!amount) {
-      console.warn('No amount provided, defaulting to 0');
-      return 0n;
-    }
-    
-    try {
-      // Remove any whitespace
-      const cleanAmount = amount.trim();
-      
-      // Handle percentage amounts (e.g., "50%")
-      if (cleanAmount.endsWith('%')) {
-        console.warn('Percentage amounts not yet implemented, defaulting to 1000');
-        return BigInt(1000 * 1e18); // Default for testing
-      }
-      
-      // Handle decimal amounts - convert to wei (assuming 18 decimals)
-      const num = parseFloat(cleanAmount);
-      if (isNaN(num)) {
-        console.error('Invalid amount format:', amount);
-        return 0n;
-      }
-      
-      return BigInt(Math.floor(num * 1e18));
-    } catch (error) {
-      console.error('Failed to parse amount:', amount, error);
-      return 0n;
-    }
   }
 }

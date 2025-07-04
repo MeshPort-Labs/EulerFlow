@@ -242,6 +242,7 @@ export const ExecutionDialog: React.FC<ExecutionDialogProps> = ({
                   <CardContent>
                     <ScrollArea className="h-48">
                       <div className="space-y-3">
+                        <>{console.log("executionSteps", executionSteps)}</>
                         {executionSteps.map((step, index) => {
                           const node = nodes.find(n => n.id === step.nodeId);
                           return (
@@ -257,7 +258,10 @@ export const ExecutionDialog: React.FC<ExecutionDialogProps> = ({
                                   {node?.data.label || 'Unknown Node'}
                                 </div>
                                 <div className="text-xs text-muted-foreground">
-                                  {step.operation.target.slice(0, 10)}...{step.operation.target.slice(-8)}
+                                {step.operation?.target 
+            ? `${step.operation.target.slice(0, 10)}...${step.operation.target.slice(-8)}`
+            : 'No target address'
+          }
                                 </div>
                               </div>
                               <Badge 

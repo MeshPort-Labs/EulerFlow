@@ -1,14 +1,16 @@
 import { useState, useCallback } from 'react';
 import type { Node, Edge } from '@xyflow/react';
 import { EulerWorkflowExecutor } from '../lib/eulerIntegrations';
-import { executeEVCBatch } from '../lib/euler/executor';
+import { executeEVCBatch } from '../lib/euler/eulerLib';
 import type { NodeData } from '../types/nodes';
+import { useAccount } from 'wagmi';
 
 interface ExecutionResult {
   success: boolean;
   transactionHash?: string;
   error?: string;
   gasUsed?: bigint;
+  message?: string;
 }
 
 interface ExecutionStep {
@@ -17,9 +19,11 @@ interface ExecutionStep {
   status: 'pending' | 'executing' | 'completed' | 'failed';
   result?: any;
   error?: string;
+  description?: string;
 }
 
 export const useWorkflowExecution = () => {
+  const { address: userAddress } = useAccount(); // Get user address from connected wallet
   const [isExecuting, setIsExecuting] = useState(false);
   const [executionSteps, setExecutionSteps] = useState<ExecutionStep[]>([]);
   const [currentStep, setCurrentStep] = useState<number>(-1);
@@ -77,6 +81,11 @@ export const useWorkflowExecution = () => {
   const validateWorkflow = useCallback((nodes: Node[], edges: Edge[]): { valid: boolean; errors: string[] } => {
     const errors: string[] = [];
 
+    // Check if wallet is connected
+    if (!userAddress) {
+      errors.push('Wallet must be connected to execute workflow');
+    }
+
     // Check for start node
     const startNodes = nodes.filter(n => n.type === 'startNode');
     if (startNodes.length === 0) {
@@ -98,89 +107,218 @@ export const useWorkflowExecution = () => {
       errors.push('Workflow contains cycles or disconnected components');
     }
 
+    // Validate individual nodes
+    nodes.forEach(node => {
+      const nodeData = node.data as NodeData;
+      
+      // Skip control nodes
+      if (nodeData.category === 'control') return;
+      
+      // Validate core actions
+      if (nodeData.category === 'core') {
+        const coreData = nodeData as any;
+        switch (coreData.action) {
+          case 'supply':
+          case 'withdraw':
+          case 'borrow':
+          case 'repay':
+            if (!coreData.vaultAddress) {
+              errors.push(`${node.data.label}: Vault address is required`);
+            }
+            if (!coreData.amount) {
+              errors.push(`${node.data.label}: Amount is required`);
+            }
+            break;
+          case 'swap':
+            if (!coreData.tokenIn || !coreData.tokenOut) {
+              errors.push(`${node.data.label}: Both input and output tokens are required`);
+            }
+            break;
+          case 'permissions':
+            if (!coreData.controller && (!coreData.collaterals || coreData.collaterals.length === 0)) {
+              errors.push(`${node.data.label}: Either controller or collaterals must be specified`);
+            }
+            break;
+        }
+      }
+      
+      // Validate strategies
+      if (nodeData.category === 'strategy') {
+        const strategyData = nodeData as any;
+        switch (strategyData.strategyType) {
+          case 'leverage':
+            if (!strategyData.collateralAsset || !strategyData.borrowAsset) {
+              errors.push(`${node.data.label}: Both collateral and borrow assets are required`);
+            }
+            if (!strategyData.leverageFactor || strategyData.leverageFactor < 1.1) {
+              errors.push(`${node.data.label}: Leverage factor must be at least 1.1x`);
+            }
+            break;
+          case 'borrow-against-lp':
+            if (!strategyData.borrowAsset || !strategyData.borrowAmount) {
+              errors.push(`${node.data.label}: Borrow asset and amount are required`);
+            }
+            break;
+        }
+      }
+    });
+
     return { valid: errors.length === 0, errors };
-  }, [getExecutionOrder]);
+  }, [getExecutionOrder, userAddress]);
 
   // Execute workflow with real EVC calls
   const executeWorkflow = useCallback(async (nodes: Node[], edges: Edge[]): Promise<ExecutionResult> => {
+    if (!userAddress) {
+      return {
+        success: false,
+        error: 'Wallet must be connected to execute workflow'
+      };
+    }
+
     setIsExecuting(true);
     setCurrentStep(-1);
     setExecutionSteps([]);
 
     try {
       console.log('🚀 Starting workflow execution...');
+      console.log('👤 User address:', userAddress);
       
       // Validate workflow
       const validation = validateWorkflow(nodes, edges);
       if (!validation.valid) {
-        throw new Error(`Workflow validation failed: ${validation.errors.join(', ')}`);
+        throw new Error(`Workflow validation failed:\n${validation.errors.join('\n')}`);
       }
 
       // Get execution order
       const executionOrder = getExecutionOrder(nodes, edges);
       console.log(`📋 Execution order: ${executionOrder.join(' → ')}`);
       
-      // Convert nodes to NodeData and execute
-      const nodeDataSequence = executionOrder
+      // Convert nodes to NodeData and execute (filter out control nodes)
+      const actionableNodes = executionOrder
         .map(nodeId => nodes.find(n => n.id === nodeId))
         .filter(node => node && node.data.category !== 'control')
-        .map(node => node!.data as NodeData);
+        .map(node => ({ node: node!, data: node!.data as NodeData }));
 
-      console.log(`🔧 Processing ${nodeDataSequence.length} actionable nodes`);
+      console.log(`🔧 Processing ${actionableNodes.length} actionable nodes`);
 
-      // Generate batch operations
-      const batchOperations = await EulerWorkflowExecutor.executeNodeSequence(nodeDataSequence);
-
-      if (batchOperations.length === 0) {
-        throw new Error('No operations generated from workflow');
+      if (actionableNodes.length === 0) {
+        return {
+          success: true,
+          message: 'Workflow completed (no actionable operations)'
+        };
       }
 
-      // Create execution steps for UI
-      const steps: ExecutionStep[] = batchOperations.map((operation, index) => ({
-        nodeId: executionOrder[index] || `step-${index}`,
-        operation,
+      // Initialize execution steps
+      const steps: ExecutionStep[] = actionableNodes.map(({ node, data }) => ({
+        nodeId: node.id,
+        operation: data,
         status: 'pending',
+        description: `${data.category}: ${node.data.label}`
       }));
 
       setExecutionSteps(steps);
-      setCurrentStep(0);
 
-      // Execute the batch on-chain
-      console.log('⛽ Executing EVC batch on devland...');
-      const result = await executeEVCBatch(batchOperations);
-
-      if (result.success) {
-        // Mark all steps as completed
+      // Execute each node
+      for (let i = 0; i < actionableNodes.length; i++) {
+        const { node, data } = actionableNodes[i];
+        
+        setCurrentStep(i);
+        
+        // Update step status to executing
         setExecutionSteps(prev => 
-          prev.map(step => ({ ...step, status: 'completed', result: 'Success' }))
+          prev.map((step, index) => 
+            index === i ? { ...step, status: 'executing' } : step
+          )
         );
 
-        setCurrentStep(-1);
-        
-        console.log('✅ Workflow execution completed successfully!');
-        return {
-          success: true,
-          transactionHash: result.transactionHash,
-          gasUsed: result.gasUsed,
-        };
-      } else {
-        throw new Error(result.error || 'Transaction failed');
+        console.log(`⚡ Executing step ${i + 1}/${actionableNodes.length}: ${node.data.label}`);
+
+        try {
+          // Generate batch operations using EulerWorkflowExecutor with user address
+          const batchOperations = await EulerWorkflowExecutor.executeNodeSequence([data], userAddress);
+
+          if (batchOperations.length === 0) {
+            console.log(`⚠️ No operations generated for node: ${node.data.label}`);
+            
+            // Mark as completed (some nodes might not generate operations)
+            setExecutionSteps(prev => 
+              prev.map((step, index) => 
+                index === i ? { 
+                  ...step, 
+                  status: 'completed', 
+                  result: 'No operations needed' 
+                } : step
+              )
+            );
+            continue;
+          }
+
+          // Execute each batch operation for this node
+          let allSuccessful = true;
+          const transactionHashes: string[] = [];
+
+          for (const batch of batchOperations) {
+            console.log(`  📦 Executing batch for ${node.data.label}...`);
+            
+            const result = await executeEVCBatch(batch.batch || [batch]);
+            console.log("result", result);
+            
+            if (result.success) {
+              console.log(`  ✅ Batch completed successfully: ${result.transactionHash}`);
+              if (result.transactionHash) {
+                transactionHashes.push(result.transactionHash);
+              }
+            } else {
+              console.error(`  ❌ Batch failed: ${result.error}`);
+              allSuccessful = false;
+              break;
+            }
+          }
+
+          if (allSuccessful) {
+            // Mark step as completed
+            setExecutionSteps(prev => 
+              prev.map((step, index) => 
+                index === i ? { 
+                  ...step, 
+                  status: 'completed', 
+                  result: `Completed (${transactionHashes.length} tx)` 
+                } : step
+              )
+            );
+          } else {
+            throw new Error('One or more batches failed');
+          }
+
+        } catch (stepError) {
+          console.error(`❌ Step ${i + 1} failed:`, stepError);
+          
+          // Mark step as failed
+          setExecutionSteps(prev => 
+            prev.map((step, index) => 
+              index === i ? { 
+                ...step, 
+                status: 'failed', 
+                error: stepError instanceof Error ? stepError.message : 'Unknown error' 
+              } : step
+            )
+          );
+
+          throw stepError; // Stop execution on first failure
+        }
       }
+
+      setCurrentStep(-1);
+      
+      console.log('✅ Workflow execution completed successfully!');
+      return {
+        success: true,
+        message: `Workflow executed successfully! Completed ${actionableNodes.length} operations.`
+      };
 
     } catch (error) {
       console.error('❌ Workflow execution failed:', error);
       
-      // Mark current step as failed
-      setExecutionSteps(prev => 
-        prev.map((step, index) => 
-          index === currentStep ? { 
-            ...step, 
-            status: 'failed', 
-            error: error instanceof Error ? error.message : 'Unknown error' 
-          } : step
-        )
-      );
-
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -188,10 +326,16 @@ export const useWorkflowExecution = () => {
     } finally {
       setIsExecuting(false);
     }
-  }, [validateWorkflow, getExecutionOrder, currentStep]);
+  }, [validateWorkflow, getExecutionOrder, userAddress]);
 
   // Simulate workflow (dry run)
   const simulateWorkflow = useCallback(async (nodes: Node[], edges: Edge[]) => {
+    if (!userAddress) {
+      return { success: false, errors: ['Wallet must be connected'] };
+    }
+
+    console.log('🔍 Simulating workflow...');
+    
     const validation = validateWorkflow(nodes, edges);
     if (!validation.valid) {
       return { success: false, errors: validation.errors };
@@ -204,13 +348,15 @@ export const useWorkflowExecution = () => {
       .map(node => node!.data as NodeData);
 
     try {
-      const operations = await EulerWorkflowExecutor.executeNodeSequence(nodeDataSequence);
+      // Simulate by generating operations without executing
+      const operations = await EulerWorkflowExecutor.executeNodeSequence(nodeDataSequence, userAddress);
       
       return {
         success: true,
         operations,
-        estimatedGas: BigInt(operations.length * 50000), // Mock gas estimation
+        estimatedGas: BigInt(operations.length * 100000), // Mock gas estimation
         executionOrder,
+        nodeCount: nodeDataSequence.length
       };
     } catch (error) {
       return {
@@ -218,7 +364,7 @@ export const useWorkflowExecution = () => {
         error: error instanceof Error ? error.message : 'Simulation failed',
       };
     }
-  }, [validateWorkflow, getExecutionOrder]);
+  }, [validateWorkflow, getExecutionOrder, userAddress]);
 
   return {
     isExecuting,

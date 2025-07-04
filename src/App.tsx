@@ -6,8 +6,22 @@ import { WalletModal } from './components/wallet/WalletModal';
 import { ChainSwitcher } from './components/wallet/ChainSwitcher';
 import { Button } from './components/ui/button';
 import { Badge } from './components/ui/badge';
-import { Save, Play, Download, Upload, Eye, Wallet, ExternalLink, AlertTriangle } from 'lucide-react';
+import { Card, CardContent } from './components/ui/card';
+import { 
+  Save, 
+  Play, 
+  Download, 
+  Upload, 
+  Eye, 
+  Wallet, 
+  ExternalLink, 
+  AlertTriangle,
+  RefreshCw,
+  Activity,
+  TrendingUp
+} from 'lucide-react';
 import { useWallet } from './hooks/useWallet';
+import { useEulerData } from './hooks/useEulerData';
 import type { Node, Edge } from '@xyflow/react';
 
 function App() {
@@ -23,6 +37,13 @@ function App() {
     isWalletModalOpen, 
     setIsWalletModalOpen 
   } = useWallet();
+
+  const { 
+    balances, 
+    userPool, 
+    loading: dataLoading, 
+    refetch: refetchData 
+  } = useEulerData();
 
   const handleSaveWorkflow = () => {
     const workflowData = {
@@ -46,7 +67,6 @@ function App() {
     });
     console.log('=== END DEBUG ===');
   };
-  
 
   const handleLoadWorkflow = () => {
     try {
@@ -87,22 +107,9 @@ function App() {
     console.log('👀 Previewing workflow:', { nodes: currentNodes, edges: currentEdges });
   };
 
-  // Handle node drag from palette - updated to match NodePalette interface
+  // Handle node drag from palette
   const handleNodeDrag = (nodeTemplate: any) => {
     console.log('Node dragged:', nodeTemplate);
-    // This will be handled by the WorkflowCanvas when the node is dropped
-  };
-
-  // Handle nodes change from canvas - removed since WorkflowCanvas manages its own state
-  const handleNodesChange = (nodes: Node[]) => {
-    console.log('Nodes updated:', nodes.length);
-    setCurrentNodes(nodes);
-  };
-
-  // Handle edges change from canvas - removed since WorkflowCanvas manages its own state
-  const handleEdgesChange = (edges: Edge[]) => {
-    console.log('Edges updated:', edges.length);
-    setCurrentEdges(edges);
   };
 
   // Handle workflow state change from canvas
@@ -111,6 +118,107 @@ function App() {
     setCurrentNodes(nodes);
     setCurrentEdges(edges);
   };
+
+  // Create a simple test workflow for verification
+  const createTestWorkflow = () => {
+    const testNodes: Node[] = [
+      {
+        id: 'start-1',
+        type: 'startNode',
+        position: { x: 100, y: 100 },
+        data: { 
+          label: 'Start', 
+          category: 'control', 
+          controlType: 'start'
+        },
+      },
+      {
+        id: 'supply-1',
+        type: 'coreActionNode',
+        position: { x: 300, y: 100 },
+        data: { 
+          label: 'Supply 1000 USDC', 
+          category: 'core',
+          action: 'supply',
+          vaultAddress: 'USDC',
+          amount: '1000'
+        },
+      },
+      {
+        id: 'end-1',
+        type: 'endNode',
+        position: { x: 500, y: 100 },
+        data: { 
+          label: 'End', 
+          category: 'control', 
+          controlType: 'end'
+        },
+      },
+    ];
+
+    const testEdges: Edge[] = [
+      {
+        id: 'e1-2',
+        source: 'start-1',
+        target: 'supply-1',
+      },
+      {
+        id: 'e2-3',
+        source: 'supply-1',
+        target: 'end-1',
+      },
+    ];
+
+    setCurrentNodes(testNodes);
+    setCurrentEdges(testEdges);
+    console.log('🧪 Created test workflow: Start → Supply 1000 USDC → End');
+  };
+
+  // Add this to your test workflow button handler in App.tsx
+const createDebugWorkflow = () => {
+  const testNodes: Node[] = [
+    {
+      id: 'start-1',
+      type: 'startNode',
+      position: { x: 100, y: 100 },
+      data: { 
+        label: 'Start', 
+        category: 'control', 
+        controlType: 'start'
+      },
+    },
+    {
+      id: 'permissions-1',
+      type: 'coreActionNode',
+      position: { x: 300, y: 100 },
+      data: { 
+        label: 'Enable USDC Controller', 
+        category: 'core',
+        action: 'permissions',
+        controller: 'USDC'
+      },
+    },
+    {
+      id: 'end-1',
+      type: 'endNode',
+      position: { x: 500, y: 100 },
+      data: { 
+        label: 'End', 
+        category: 'control', 
+        controlType: 'end'
+      },
+    },
+  ];
+
+  const testEdges: Edge[] = [
+    { id: 'e1-2', source: 'start-1', target: 'permissions-1' },
+    { id: 'e2-3', source: 'permissions-1', target: 'end-1' },
+  ];
+
+  setCurrentNodes(testNodes);
+  setCurrentEdges(testEdges);
+  console.log('🧪 Created debug workflow: Enable Controller (simpler test)');
+};
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
@@ -121,10 +229,19 @@ function App() {
           <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
             Visual Strategy Builder
           </Badge>
+          
           {/* Debug Info */}
           <Badge variant="outline" className="text-xs">
             Nodes: {currentNodes.length} | Edges: {currentEdges.length}
           </Badge>
+
+          {/* Data Loading Indicator */}
+          {dataLoading && (
+            <Badge variant="outline" className="text-xs animate-pulse">
+              <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
+              Loading...
+            </Badge>
+          )}
         </div>
         
         <div className="flex items-center space-x-4">
@@ -163,6 +280,16 @@ function App() {
 
           {/* Action Buttons */}
           <div className="flex items-center space-x-2 border-l border-gray-200 pl-4">
+            <Button variant="outline" size="sm" onClick={createDebugWorkflow}>
+              <Activity className="h-4 w-4 mr-2" />
+              Test Workflow
+            </Button>
+
+            <Button variant="outline" size="sm" onClick={refetchData}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
+            
             <Button variant="outline" size="sm" onClick={handleSaveWorkflow}>
               <Save className="h-4 w-4 mr-2" />
               Save
@@ -192,8 +319,8 @@ function App() {
             </Button>
 
             <Button variant="outline" size="sm" onClick={debugCurrentNodes}>
-  Debug Nodes
-</Button>
+              Debug Nodes
+            </Button>
           </div>
         </div>
       </header>
@@ -210,6 +337,50 @@ function App() {
             </div>
             <Button size="sm" onClick={switchToDevland}>
               Switch to Devland
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Euler Data Status */}
+      {wallet.isConnected && wallet.isCorrectChain && (
+        <div className="bg-blue-50 border-b border-blue-200 px-6 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <TrendingUp className="h-4 w-4 text-blue-600" />
+                <span className="text-sm text-blue-800 font-medium">Devland Status:</span>
+              </div>
+              
+              {/* Token Balances */}
+              <div className="flex items-center space-x-2">
+                {Object.entries(balances).slice(0, 4).map(([symbol, balance]) => (
+                  <Badge key={symbol} variant="outline" className="text-xs bg-white">
+                    {symbol}: {balance?.formatted ? parseFloat(balance.formatted).toFixed(2) : '0'}
+                  </Badge>
+                ))}
+              </div>
+
+              {/* User Pool Status */}
+              <Badge 
+                variant="outline" 
+                className={`text-xs ${userPool ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}
+              >
+                Pool: {userPool ? `${userPool.slice(0, 8)}...` : 'None'}
+              </Badge>
+            </div>
+            
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={refetchData}
+              disabled={dataLoading}
+            >
+              {dataLoading ? (
+                <RefreshCw className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
             </Button>
           </div>
         </div>
