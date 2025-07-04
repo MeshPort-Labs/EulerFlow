@@ -146,6 +146,33 @@
   --property-panel-section-bg: oklch(0.279 0.041 260.031);
   --property-panel-field-bg: oklch(0.129 0.042 264.695);
 
+  /* Node specific variables */
+--node-bg: oklch(1 0 0);
+--node-border: oklch(0.929 0.013 255.508);
+--node-shadow: oklch(0 0 0 / 0.05);
+--node-shadow-selected: oklch(0 0 0 / 0.15);
+--node-radius: 0.75rem;
+--node-padding: 0.75rem;
+--node-width: 140px;
+--node-height: 80px;
+
+/* Node category colors */
+--node-control: oklch(0.6 0.12 150);
+--node-core: oklch(0.6 0.15 220);
+--node-lp-toolkit: oklch(0.6 0.15 140);
+--node-strategy: oklch(0.6 0.15 280);
+--node-alert: oklch(0.7 0.15 50);
+
+/* Node status colors */
+--node-status-ready: oklch(0.6 0.15 140);
+--node-status-config: oklch(0.7 0.15 50);
+--node-status-error: oklch(0.6 0.15 10);
+
+/* Handle colors */
+--handle-size: 12px;
+--handle-border: 2px;
+--handle-shadow: oklch(0 0 0 / 0.1);
+
 }
 
 @layer base {
@@ -205,4 +232,28 @@
   background-color: color-mix(in srgb, var(--category-control) 15%, transparent);
   color: var(--category-control);
   border-color: var(--category-control);
+}
+
+.react-flow__node {
+  cursor: pointer;
+}
+
+.react-flow__node.selected {
+  z-index: 1000;
+}
+
+.react-flow__handle {
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.react-flow__node:hover .react-flow__handle,
+.react-flow__node.selected .react-flow__handle {
+  opacity: 1;
+}
+
+/* Delete button always visible when selected */
+.react-flow__node.selected button {
+  display: flex !important;
+  opacity: 1 !important;
 }

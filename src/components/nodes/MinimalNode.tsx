@@ -22,19 +22,39 @@ export const MinimalNode: React.FC<MinimalNodeProps> = ({
   onDelete 
 }) => {
   const nodeData = data as NodeData;
+  console.log("nodeData", nodeData);
   const status = config.getStatus(nodeData);
 
   return (
     <BaseNode data={nodeData} selected={selected} onDelete={onDelete}>
-      <div className="flex flex-col items-center justify-center h-16">
-        <div className={`w-8 h-8 rounded-full ${config.colorClass} flex items-center justify-center mb-1`}>
+      <div className="flex items-center gap-3">
+        {/* Icon container - circular like in your reference */}
+        <div 
+          className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${config.colorClass}`}
+        >
           {config.icon}
         </div>
-        <span className="text-xs font-medium text-gray-700">{config.label}</span>
-        <div className={`w-2 h-2 rounded-full mt-1 ${
-          status === 'ready' ? 'bg-green-500' : 
-          status === 'error' ? 'bg-red-500' : 'bg-yellow-500'
-        }`} />
+        
+        {/* Content */}
+        <div className="flex-1 min-w-0">
+          <div className="font-medium text-sm text-gray-900 truncate">
+            {config.label}
+          </div>
+          
+          {/* Status dot */}
+          <div className="flex items-center gap-1 mt-1">
+            <div 
+              className={`w-2 h-2 rounded-full ${
+                status === 'ready' ? 'bg-green-500' : 
+                status === 'error' ? 'bg-red-500' : 'bg-yellow-500'
+              }`} 
+            />
+            <span className="text-xs text-gray-500">
+              {status === 'ready' ? 'Ready' : 
+               status === 'error' ? 'Error' : 'Configure'}
+            </span>
+          </div>
+        </div>
       </div>
     </BaseNode>
   );

@@ -11,6 +11,7 @@ export interface BaseNodeData {
   label: string;
   category: NodeCategory;
   description?: string;
+  onDelete?: () => void;
   [key: string]: unknown;
 }
 
