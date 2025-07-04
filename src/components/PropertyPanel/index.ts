@@ -1,5 +1,5 @@
 export { PropertyPanel } from './PropertyPanel';
-export { CoreActionNodeProperties } from './CoreActionNodeProperties';
-export { LpToolkitNodeProperties } from './LpToolkitNodeProperties';
-export { StrategyNodeProperties } from './StrategyNodeProperties';
 export { GeneralNodeProperties } from './GeneralNodeProperties';
+export * from './components';
+export * from './sections';
+export * from './configs/formConfigs';

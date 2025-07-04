@@ -39,6 +39,38 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Property Panel specific variables */
+  --property-panel-bg: var(--card);
+  --property-panel-border: var(--border);
+  --property-panel-header-bg: var(--background);
+  --property-panel-section-bg: var(--card);
+  --property-panel-field-bg: var(--background);
+  --property-panel-field-border: var(--input);
+  --property-panel-field-focus: var(--ring);
+  --property-panel-text: var(--foreground);
+  --property-panel-text-muted: var(--muted-foreground);
+  --property-panel-accent: var(--primary);
+  --property-panel-accent-foreground: var(--primary-foreground);
+  --property-panel-success: var(--chart-2);
+  --property-panel-warning: var(--chart-4);
+  --property-panel-error: var(--destructive);
+  --property-panel-info: var(--chart-1);
+  
+  /* Category specific colors */
+  --category-core: var(--chart-1);
+  --category-strategy: var(--chart-3);
+  --category-lp-toolkit: var(--chart-2);
+  --category-alert: var(--chart-4);
+  --category-control: var(--muted);
+  
+  /* Form specific variables */
+  --form-field-spacing: 1rem;
+  --form-section-spacing: 1.5rem;
+  --form-input-radius: var(--radius);
+  --form-label-weight: 500;
+  --form-help-text-size: 0.75rem;
+  --form-error-text-size: 0.75rem;
 }
 
 :root {
@@ -108,6 +140,12 @@
   --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.551 0.027 264.364);
+
+  /* Dark mode overrides */
+  --property-panel-bg: oklch(0.208 0.042 265.755);
+  --property-panel-section-bg: oklch(0.279 0.041 260.031);
+  --property-panel-field-bg: oklch(0.129 0.042 264.695);
+
 }
 
 @layer base {
@@ -117,4 +155,54 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+
+/* Custom utility classes for property panel */
+.property-panel-section {
+  background-color: var(--property-panel-section-bg);
+  border: 1px solid var(--property-panel-border);
+  border-radius: var(--radius);
+}
+
+.property-panel-field {
+  background-color: var(--property-panel-field-bg);
+  border: 1px solid var(--property-panel-field-border);
+  border-radius: var(--form-input-radius);
+  transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.property-panel-field:focus-within {
+  border-color: var(--property-panel-field-focus);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--property-panel-field-focus) 20%, transparent);
+}
+
+.category-badge-core {
+  background-color: color-mix(in srgb, var(--category-core) 15%, transparent);
+  color: var(--category-core);
+  border-color: var(--category-core);
+}
+
+.category-badge-strategy {
+  background-color: color-mix(in srgb, var(--category-strategy) 15%, transparent);
+  color: var(--category-strategy);
+  border-color: var(--category-strategy);
+}
+
+.category-badge-lp-toolkit {
+  background-color: color-mix(in srgb, var(--category-lp-toolkit) 15%, transparent);
+  color: var(--category-lp-toolkit);
+  border-color: var(--category-lp-toolkit);
+}
+
+.category-badge-alert {
+  background-color: color-mix(in srgb, var(--category-alert) 15%, transparent);
+  color: var(--category-alert);
+  border-color: var(--category-alert);
+}
+
+.category-badge-control {
+  background-color: color-mix(in srgb, var(--category-control) 15%, transparent);
+  color: var(--category-control);
+  border-color: var(--category-control);
 }

@@ -74,12 +74,7 @@ export const GeneralNodeProperties: React.FC<GeneralNodePropertiesProps> = ({ da
             <div className="flex justify-between">
               <span className="text-muted-foreground">Status:</span>
               <Badge variant="outline" className="text-xs">
-                {data.category === 'vault' && (!data.vaultAddress || !data.amount) 
-                  ? 'Needs Configuration' 
-                  : data.category === 'swap' && (!data.tokenIn || !data.tokenOut || !data.amountIn)
-                  ? 'Needs Configuration'
-                  : 'Ready'
-                }
+                {data.label && data.description ? 'Ready' : 'Needs Configuration'}
               </Badge>
             </div>
           </div>
