@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { WorkflowCanvas } from './components/Canvas/WorkflowCanvas';
 import { NodePalette } from './components/NodePalette/NodePalette';
 import { ExecutionDialog } from './components/ExecutionDialog/ExecutionDialog';
+import { WalletModal } from './components/wallet/WalletModal';
+import { ChainSwitcher } from './components/wallet/ChainSwitcher';
 import { Button } from './components/ui/button';
 import { Badge } from './components/ui/badge';
-import { Save, Play, Download, Upload, Eye, Wallet, ExternalLink } from 'lucide-react';
+import { Save, Play, Download, Upload, Eye, Wallet, ExternalLink, AlertTriangle } from 'lucide-react';
 import { useWallet } from './hooks/useWallet';
 import type { Node, Edge } from '@xyflow/react';
 
@@ -12,7 +14,15 @@ function App() {
   const [isExecutionDialogOpen, setIsExecutionDialogOpen] = useState(false);
   const [currentNodes, setCurrentNodes] = useState<Node[]>([]);
   const [currentEdges, setCurrentEdges] = useState<Edge[]>([]);
-  const { wallet, connectWallet, disconnectWallet, switchToMainnet } = useWallet();
+  
+  const { 
+    wallet, 
+    connectWallet, 
+    disconnectWallet, 
+    switchToDevland,
+    isWalletModalOpen, 
+    setIsWalletModalOpen 
+  } = useWallet();
 
   const handleSaveWorkflow = () => {
     const workflowData = {
@@ -22,18 +32,28 @@ function App() {
     };
     
     localStorage.setItem('euler-workflow', JSON.stringify(workflowData));
-    
-    // Show success feedback
-    const event = new CustomEvent('workflow-saved');
-    window.dispatchEvent(event);
+    console.log('💾 Workflow saved to localStorage');
   };
+
+  const debugCurrentNodes = () => {
+    console.log('=== DEBUGGING CURRENT NODES ===');
+    currentNodes.forEach((node, index) => {
+      console.log(`Node ${index}:`, {
+        id: node.id,
+        type: node.type,
+        data: node.data,
+      });
+    });
+    console.log('=== END DEBUG ===');
+  };
+  
 
   const handleLoadWorkflow = () => {
     try {
       const saved = localStorage.getItem('euler-workflow');
       if (saved) {
         const workflowData = JSON.parse(saved);
-        console.log('Loaded workflow:', workflowData);
+        console.log('📂 Loaded workflow:', workflowData);
         // TODO: Implement workflow loading in canvas
       }
     } catch (error) {
@@ -43,185 +63,179 @@ function App() {
 
   const handleExecuteWorkflow = () => {
     if (!wallet.isConnected) {
-      alert('Please connect your wallet first');
+      connectWallet();
       return;
     }
     
-    if (wallet.chainId !== 1) {
-      const shouldSwitch = confirm('This workflow is designed for Ethereum mainnet. Switch networks?');
+    if (!wallet.isCorrectChain) {
+      const shouldSwitch = confirm(
+        'This workflow is designed for Devland. Switch networks?'
+      );
       if (shouldSwitch) {
-        switchToMainnet();
-        return;
+        switchToDevland();
       }
+      return;
     }
     
+    console.log('🚀 Opening execution dialog...');
+    console.log('Current nodes:', currentNodes);
+    console.log('Current edges:', currentEdges);
     setIsExecutionDialogOpen(true);
   };
 
-  const handleSimulateWorkflow = () => {
-    setIsExecutionDialogOpen(true);
+  const handlePreviewWorkflow = () => {
+    console.log('👀 Previewing workflow:', { nodes: currentNodes, edges: currentEdges });
   };
 
-  const handleWalletAction = () => {
-    if (wallet.isConnected) {
-      disconnectWallet();
-    } else {
-      connectWallet();
-    }
+  // Handle node drag from palette - updated to match NodePalette interface
+  const handleNodeDrag = (nodeTemplate: any) => {
+    console.log('Node dragged:', nodeTemplate);
+    // This will be handled by the WorkflowCanvas when the node is dropped
   };
 
-  const handleExportWorkflow = () => {
-    const workflowData = {
-      nodes: currentNodes,
-      edges: currentEdges,
-      metadata: {
-        version: '1.0.0',
-        createdAt: new Date().toISOString(),
-        title: 'Euler Workflow',
-        nodeCount: currentNodes.length,
-        edgeCount: currentEdges.length,
-      },
-    };
-
-    const blob = new Blob([JSON.stringify(workflowData, null, 2)], {
-      type: 'application/json',
-    });
-    
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `euler-workflow-${Date.now()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+  // Handle nodes change from canvas - removed since WorkflowCanvas manages its own state
+  const handleNodesChange = (nodes: Node[]) => {
+    console.log('Nodes updated:', nodes.length);
+    setCurrentNodes(nodes);
   };
 
-  const handleImportWorkflow = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
-    input.onchange = (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          try {
-            const workflowData = JSON.parse(e.target?.result as string);
-            console.log('Imported workflow:', workflowData);
-            // TODO: Update canvas with imported data
-          } catch (error) {
-            console.error('Failed to import workflow:', error);
-            alert('Invalid workflow file');
-          }
-        };
-        reader.readAsText(file);
-      }
-    };
-    input.click();
+  // Handle edges change from canvas - removed since WorkflowCanvas manages its own state
+  const handleEdgesChange = (edges: Edge[]) => {
+    console.log('Edges updated:', edges.length);
+    setCurrentEdges(edges);
   };
 
+  // Handle workflow state change from canvas
   const handleWorkflowStateChange = (nodes: Node[], edges: Edge[]) => {
+    console.log('Workflow state changed:', { nodes: nodes.length, edges: edges.length });
     setCurrentNodes(nodes);
     setCurrentEdges(edges);
   };
 
-  const getNetworkName = (chainId: number) => {
-    switch (chainId) {
-      case 1: return 'Ethereum';
-      case 10: return 'Optimism';
-      case 137: return 'Polygon';
-      case 42161: return 'Arbitrum';
-      case 8453: return 'Base';
-      default: return `Chain ${chainId}`;
-    }
-  };
-
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <header className="border-b bg-card shadow-sm flex-shrink-0">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">
-                Euler Workflow Builder
-              </h1>
-              <p className="text-muted-foreground text-sm mt-1">
-                Visual workflow builder for EulerSwap and Euler V2
-              </p>
-            </div>
-            
-            <div className="flex items-center gap-2">
-              {/* Wallet Connection */}
-              <div className="flex items-center gap-2">
-                {wallet.isConnected && (
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-xs">
-                      {getNetworkName(wallet.chainId!)}
-                    </Badge>
-                    <div className="text-xs text-muted-foreground font-mono">
-                      {wallet.address?.slice(0, 6)}...{wallet.address?.slice(-4)}
-                    </div>
-                  </div>
-                )}
+    <div className="h-screen flex flex-col bg-gray-50">
+      {/* Header */}
+      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          <h1 className="text-2xl font-bold text-gray-900">EulerFlow</h1>
+          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+            Visual Strategy Builder
+          </Badge>
+          {/* Debug Info */}
+          <Badge variant="outline" className="text-xs">
+            Nodes: {currentNodes.length} | Edges: {currentEdges.length}
+          </Badge>
+        </div>
+        
+        <div className="flex items-center space-x-4">
+          {/* Chain Switcher */}
+          <ChainSwitcher />
+          
+          {/* Wallet Connection */}
+          <div className="flex items-center space-x-2">
+            <Wallet className="h-4 w-4 text-gray-500" />
+            {wallet.isConnected ? (
+              <div className="flex items-center space-x-2">
+                <Badge variant="default" className="bg-green-100 text-green-800">
+                  Connected
+                </Badge>
+                <span className="text-sm text-gray-600 font-mono">
+                  {wallet.address?.slice(0, 6)}...{wallet.address?.slice(-4)}
+                </span>
                 <Button 
-                  variant={wallet.isConnected ? "default" : "outline"} 
+                  variant="outline" 
                   size="sm"
-                  onClick={handleWalletAction}
+                  onClick={disconnectWallet}
                 >
-                  <Wallet className="w-4 h-4 mr-2" />
-                  {wallet.isConnected ? 'Disconnect' : 'Connect Wallet'}
+                  Disconnect
                 </Button>
               </div>
-
-              <div className="h-6 w-px bg-border mx-1" />
-
-              {/* File Operations */}
-              <Button variant="ghost" size="sm" onClick={handleImportWorkflow}>
-                <Upload className="w-4 h-4 mr-2" />
-                Import
-              </Button>
-              <Button variant="ghost" size="sm" onClick={handleExportWorkflow}>
-                <Download className="w-4 h-4 mr-2" />
-                Export
-              </Button>
-              
-              {/* Workflow Operations */}
-              <div className="h-6 w-px bg-border mx-1" />
-              <Button variant="ghost" size="sm" onClick={handleSaveWorkflow}>
-                <Save className="w-4 h-4 mr-2" />
-                Save
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleSimulateWorkflow}>
-                <Eye className="w-4 h-4 mr-2" />
-                Simulate
-              </Button>
+            ) : (
               <Button 
-                size="sm" 
-                onClick={handleExecuteWorkflow}
-                disabled={!wallet.isConnected}
+                variant="outline" 
+                size="sm"
+                onClick={() => connectWallet()}
               >
-                <Play className="w-4 h-4 mr-2" />
-                Execute
+                Connect Wallet
               </Button>
-            </div>
+            )}
           </div>
 
-          {/* Wallet Error Display */}
-          {wallet.error && (
-            <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-700">
-              {wallet.error}
-            </div>
-          )}
+          {/* Action Buttons */}
+          <div className="flex items-center space-x-2 border-l border-gray-200 pl-4">
+            <Button variant="outline" size="sm" onClick={handleSaveWorkflow}>
+              <Save className="h-4 w-4 mr-2" />
+              Save
+            </Button>
+            
+            <Button variant="outline" size="sm" onClick={handleLoadWorkflow}>
+              <Upload className="h-4 w-4 mr-2" />
+              Load
+            </Button>
+            
+            <Button variant="outline" size="sm" onClick={handlePreviewWorkflow}>
+              <Eye className="h-4 w-4 mr-2" />
+              Preview
+            </Button>
+            
+            <Button 
+              className="bg-blue-600 hover:bg-blue-700"
+              onClick={handleExecuteWorkflow}
+              disabled={currentNodes.length === 0}
+              title={currentNodes.length === 0 ? 'Add nodes to your workflow first' : 'Execute workflow'}
+            >
+              <Play className="h-4 w-4 mr-2" />
+              Execute Workflow
+              {currentNodes.length === 0 && (
+                <span className="ml-2 text-xs opacity-75">(No nodes)</span>
+              )}
+            </Button>
+
+            <Button variant="outline" size="sm" onClick={debugCurrentNodes}>
+  Debug Nodes
+</Button>
+          </div>
         </div>
       </header>
-      
-      <div className="flex flex-1 overflow-hidden">
-        <NodePalette onNodeDrag={() => {}} />
-        <main className="flex-1">
-          <WorkflowCanvas onWorkflowStateChange={handleWorkflowStateChange} />
+
+      {/* Network Warning Banner */}
+      {wallet.isConnected && !wallet.isCorrectChain && (
+        <div className="bg-yellow-50 border-b border-yellow-200 px-6 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <AlertTriangle className="h-5 w-5 text-yellow-600" />
+              <span className="text-sm text-yellow-800">
+                You're connected to the wrong network. Please switch to Devland to execute workflows.
+              </span>
+            </div>
+            <Button size="sm" onClick={switchToDevland}>
+              Switch to Devland
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Main Content */}
+      <div className="flex-1 flex">
+        {/* Node Palette */}
+        <aside className="w-80 bg-white border-r border-gray-200 overflow-y-auto">
+          <NodePalette onNodeDrag={handleNodeDrag} />
+        </aside>
+
+        {/* Canvas */}
+        <main className="flex-1 relative">
+          <WorkflowCanvas 
+            onWorkflowStateChange={handleWorkflowStateChange}
+          />
         </main>
       </div>
 
-      {/* Execution Dialog */}
+      {/* Modals */}
+      <WalletModal
+        isOpen={isWalletModalOpen}
+        onClose={() => setIsWalletModalOpen(false)}
+      />
+      
       <ExecutionDialog
         isOpen={isExecutionDialogOpen}
         onClose={() => setIsExecutionDialogOpen(false)}

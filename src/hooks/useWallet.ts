@@ -1,94 +1,78 @@
-import { useState, useCallback } from 'react';
-
-interface WalletState {
-  address: string | null;
-  isConnected: boolean;
-  chainId: number | null;
-  error: string | null;
-}
+import { useState, useEffect } from 'react';
+import { useAccount, useConnect, useDisconnect, useChainId, useSwitchChain } from 'wagmi';
+import { devlandChain } from '../lib/wallet/config';
 
 export const useWallet = () => {
-  const [wallet, setWallet] = useState<WalletState>({
-    address: null,
-    isConnected: false,
-    chainId: null,
-    error: null,
-  });
+  const { address, isConnected } = useAccount();
+  const { connect, connectors, isPending } = useConnect();
+  const { disconnect } = useDisconnect();
+  const chainId = useChainId();
+  const { switchChain } = useSwitchChain();
+  
+  const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
 
-  const connectWallet = useCallback(async () => {
-    try {
-      if (!window.ethereum) {
-        throw new Error('MetaMask is not installed');
-      }
+  const wallet = {
+    isConnected,
+    address: address || null,
+    chainId: chainId || null,
+    isCorrectChain: chainId === devlandChain.id,
+  };
 
-      // Request account access
-      const accounts = await window.ethereum.request({
-        method: 'eth_requestAccounts',
-      });
-
-      // Get chain ID
-      const chainId = await window.ethereum.request({
-        method: 'eth_chainId',
-      });
-
-      setWallet({
-        address: accounts[0],
-        isConnected: true,
-        chainId: parseInt(chainId, 16),
-        error: null,
-      });
-
-      // Listen for account changes
-      window.ethereum.on('accountsChanged', (accounts: string[]) => {
-        if (accounts.length === 0) {
-          disconnectWallet();
-        } else {
-          setWallet(prev => ({ ...prev, address: accounts[0] }));
+  const connectWallet = async (connectorId?: string) => {
+    if (connectorId) {
+      const connector = connectors.find(c => c.id === connectorId);
+      if (connector) {
+        try {
+          await connect({ connector });
+          setIsWalletModalOpen(false);
+        } catch (error) {
+          console.error('Failed to connect wallet:', error);
+          throw error;
         }
-      });
-
-      // Listen for chain changes
-      window.ethereum.on('chainChanged', (chainId: string) => {
-        setWallet(prev => ({ ...prev, chainId: parseInt(chainId, 16) }));
-      });
-
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to connect wallet';
-      setWallet(prev => ({ ...prev, error: errorMessage }));
+      }
+    } else {
+      // Open wallet selection modal
+      setIsWalletModalOpen(true);
     }
-  }, []);
+  };
 
-  const disconnectWallet = useCallback(() => {
-    setWallet({
-      address: null,
-      isConnected: false,
-      chainId: null,
-      error: null,
-    });
-  }, []);
+  const disconnectWallet = () => {
+    disconnect();
+    console.log('🔌 Wallet disconnected');
+  };
 
-  const switchToMainnet = useCallback(async () => {
+  const switchToDevland = async () => {
     try {
-      await window.ethereum.request({
-        method: 'wallet_switchEthereumChain',
-        params: [{ chainId: '0x1' }], // Mainnet
-      });
+      await switchChain({ chainId: devlandChain.id });
     } catch (error) {
-      console.error('Failed to switch to mainnet:', error);
+      console.error('Failed to switch to devland:', error);
+      // If the chain doesn't exist in the wallet, try to add it
+      if (window.ethereum) {
+        try {
+          await window.ethereum.request({
+            method: 'wallet_addEthereumChain',
+            params: [{
+              chainId: `0x${devlandChain.id.toString(16)}`,
+              chainName: devlandChain.name,
+              nativeCurrency: devlandChain.nativeCurrency,
+              rpcUrls: [devlandChain.rpcUrls.default.http[0]],
+            }],
+          });
+        } catch (addError) {
+          console.error('Failed to add devland chain:', addError);
+        }
+      }
     }
-  }, []);
+  };
 
   return {
     wallet,
     connectWallet,
     disconnectWallet,
-    switchToMainnet,
+    switchToDevland,
+    connectors,
+    isPending,
+    isWalletModalOpen,
+    setIsWalletModalOpen,
   };
 };
-
-// Extend window object for TypeScript
-declare global {
-  interface Window {
-    ethereum?: any;
-  }
-}

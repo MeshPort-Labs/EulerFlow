@@ -19,7 +19,8 @@ export interface EulerVault {
   }
   
   export interface BatchOperation {
-    target: string;
+    targetContract: string;
     value: bigint;
-    calldata: string;
+    data: string;
+    onBehalfOfAccount?: string;
   }

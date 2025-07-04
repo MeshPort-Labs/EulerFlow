@@ -149,7 +149,6 @@ const WorkflowCanvasInner: React.FC<WorkflowCanvasProps> = ({ onWorkflowStateCha
   // Use the selection change hook (now inside ReactFlow context)
   const onSelectionChange = useCallback(
     ({ nodes: selectedNodes }: { nodes: Node[]; edges: Edge[] }) => {
-      console.log('Selection changed:', selectedNodes); 
       if (selectedNodes.length > 0) {
         const node = selectedNodes[0];
         setSelectedNode(node);

@@ -1,19 +1,26 @@
-// src/lib/eulerIntegration.ts
+// src/lib/eulerIntegrations.ts (Fixed)
 import type { NodeData, CoreActionNodeData, StrategyNodeData, LpToolkitNodeData } from '../types/nodes';
-import type { BatchOperation } from '../types/euler';
-
-// Import your euler-lib functions
-// import { 
-//   supplyToVault, 
-//   borrowAndSendTo, 
-//   createLeverageStrategy,
-//   createLpCollateralizationStrategy,
-//   // ... other functions
-// } from 'euler-lib';
+import { EulerPrimitives, type BatchOperation } from './euler/primitives';
+import { DEVLAND_ADDRESSES, DEVLAND_USER, getVaultAddress } from './euler/addresses';
+import { EulerStrategies } from './euler/strategies';
 
 export class EulerWorkflowExecutor {
-  
+  private static primitives: EulerPrimitives;
+  private static strategies: EulerStrategies;
+  private static initialized = false;
+
+  static async initialize() {
+    if (!this.initialized) {
+      this.primitives = new EulerPrimitives(DEVLAND_ADDRESSES, DEVLAND_USER);
+      this.strategies = new EulerStrategies(DEVLAND_ADDRESSES, DEVLAND_USER);
+      this.initialized = true;
+      console.log('🔧 EulerWorkflowExecutor initialized with devland addresses');
+    }
+  }
+
   static async executeNodeSequence(nodes: NodeData[]): Promise<BatchOperation[]> {
+    await this.initialize();
+    
     const operations: BatchOperation[] = [];
     
     for (const node of nodes) {
@@ -21,10 +28,11 @@ export class EulerWorkflowExecutor {
       operations.push(...nodeOps);
     }
     
+    console.log(`📦 Generated ${operations.length} batch operations from ${nodes.length} nodes`);
     return operations;
   }
 
-  static async nodeToOperations(node: NodeData): Promise<BatchOperation[]> {
+  private static async nodeToOperations(node: NodeData): Promise<BatchOperation[]> {
     switch (node.category) {
       case 'core':
         return this.handleCoreAction(node as CoreActionNodeData);
@@ -35,164 +43,176 @@ export class EulerWorkflowExecutor {
       case 'control':
         return []; // Control nodes don't generate operations
       default:
+        console.warn(`Unknown node category: ${node.category}`);
         return [];
     }
   }
 
   private static async handleCoreAction(data: CoreActionNodeData): Promise<BatchOperation[]> {
-    // Convert UI data to euler-lib function calls
+    console.log(`🔧 Processing core action: ${data.action}`);
+    console.log(`🔧 Node data:`, data);
+    
     switch (data.action) {
-      case 'supply':
-        // return [supplyToVault(data.vaultAddress, parseUnits(data.amount, 18))];
-        return [{
-          target: data.vaultAddress!,
-          value: 0n,
-          calldata: `0x${Buffer.from(`deposit(${data.amount})`).toString('hex')}`,
-        }];
+      case 'supply': {
+        // Check if vaultAddress is properly set
+        if (!data.vaultAddress) {
+          throw new Error(`Supply action missing vault address. Available fields: ${Object.keys(data).join(', ')}`);
+        }
+        
+        // Try to get vault address by symbol first, then use direct address
+        let vaultAddress;
+        try {
+          vaultAddress = getVaultAddress(data.vaultAddress as keyof typeof DEVLAND_ADDRESSES.vaults);
+        } catch (error) {
+          // If not a known symbol, try to use as direct address
+          if (data.vaultAddress.startsWith('0x')) {
+            vaultAddress = data.vaultAddress as `0x${string}`;
+          } else {
+            throw new Error(`Invalid vault address: ${data.vaultAddress}. Must be one of: ${Object.keys(DEVLAND_ADDRESSES.vaults).join(', ')}`);
+          }
+        }
+        
+        const amount = this.parseAmount(data.amount);
+        console.log(`💰 Supply ${amount} to vault ${vaultAddress} (${data.vaultAddress})`);
+        return [this.primitives.supplyToVault(vaultAddress, amount, DEVLAND_USER)];
+      }
       
-      case 'withdraw':
-        // return [withdrawFromVault(data.vaultAddress, parseUnits(data.amount, 18), userAddress)];
-        return [{
-          target: data.vaultAddress!,
-          value: 0n,
-          calldata: `0x${Buffer.from(`withdraw(${data.amount})`).toString('hex')}`,
-        }];
+      case 'withdraw': {
+        if (!data.vaultAddress) {
+          throw new Error(`Withdraw action missing vault address`);
+        }
+        const vaultAddress = getVaultAddress(data.vaultAddress as keyof typeof DEVLAND_ADDRESSES.vaults);
+        const amount = this.parseAmount(data.amount);
+        return [this.primitives.withdrawFromVault(vaultAddress, amount, DEVLAND_USER)];
+      }
       
-      case 'borrow':
-        // return [borrowAndSendTo(data.vaultAddress, parseUnits(data.amount, 18), userAddress)];
-        return [{
-          target: data.vaultAddress!,
-          value: 0n,
-          calldata: `0x${Buffer.from(`borrow(${data.amount})`).toString('hex')}`,
-        }];
+      case 'borrow': {
+        if (!data.vaultAddress) {
+          throw new Error(`Borrow action missing vault address`);
+        }
+        const vaultAddress = getVaultAddress(data.vaultAddress as keyof typeof DEVLAND_ADDRESSES.vaults);
+        const amount = this.parseAmount(data.amount);
+        return [this.primitives.borrowFromVault(vaultAddress, amount, DEVLAND_USER)];
+      }
       
-      case 'repay':
-        // return [repayToVault(data.vaultAddress, parseUnits(data.amount, 18))];
-        return [{
-          target: data.vaultAddress!,
-          value: 0n,
-          calldata: `0x${Buffer.from(`repay(${data.amount})`).toString('hex')}`,
-        }];
+      case 'repay': {
+        if (!data.vaultAddress) {
+          throw new Error(`Repay action missing vault address`);
+        }
+        const vaultAddress = getVaultAddress(data.vaultAddress as keyof typeof DEVLAND_ADDRESSES.vaults);
+        const amount = this.parseAmount(data.amount);
+        return [this.primitives.repayToVault(vaultAddress, amount)];
+      }
       
-      case 'swap':
-        // return [await prepareDirectPoolSwap(poolAddress, data.tokenIn, data.tokenOut, amount, minOut, receiver)];
-        return [{
-          target: '0x2Bba09866b6F1025258542478C39720A09B728bF', // Swapper
-          value: 0n,
-          calldata: `0x${Buffer.from(`swap(${data.tokenIn},${data.tokenOut},${data.amount})`).toString('hex')}`,
-        }];
+      case 'permissions': {
+        const ops: BatchOperation[] = [];
+        
+        // Enable collaterals
+        if (data.collaterals) {
+          data.collaterals.forEach(collateral => {
+            const vaultAddress = getVaultAddress(collateral as keyof typeof DEVLAND_ADDRESSES.vaults);
+            ops.push(this.primitives.enableCollateral(vaultAddress));
+          });
+        }
+        
+        // Enable controller
+        if (data.controller) {
+          const vaultAddress = getVaultAddress(data.controller as keyof typeof DEVLAND_ADDRESSES.vaults);
+          ops.push(this.primitives.enableController(vaultAddress));
+        }
+        
+        return ops;
+      }
       
-      case 'permissions':
-        // return [enableCollateral(data.controller), ...data.collaterals.map(c => enableCollateral(c))];
-        return [{
-          target: '0x0C9a3dd6b8F28529d72d7f9cE918D493519EE383', // EVC
-          value: 0n,
-          calldata: `0x${Buffer.from(`enableCollateral(${data.controller})`).toString('hex')}`,
-        }];
+      case 'swap': {
+        // TODO: Implement swap through EulerSwap
+        console.warn('Swap action not yet implemented');
+        return [];
+      }
       
       default:
+        console.warn(`Unknown core action: ${data.action}`);
         return [];
     }
   }
 
   private static async handleStrategy(data: StrategyNodeData): Promise<BatchOperation[]> {
-    // Convert UI data to euler-lib strategy composer calls
+    console.log(`🎯 Processing strategy: ${data.strategyType}`);
+    
     switch (data.strategyType) {
-      case 'leverage':
-        // const strategy = await createLeverageStrategy(
-        //   data.collateralAsset, 
-        //   parseUnits(data.collateralAmount, 18),
-        //   data.borrowAsset,
-        //   data.leverageFactor
-        // );
-        // return strategy.supplyMarginBatch.concat(strategy.borrowAndSwapBatch);
-        return [{
-          target: '0x0000000000000000000000000000000000000000', // Strategy executor
-          value: 0n,
-          calldata: `0x${Buffer.from(`leverage(${data.collateralAsset},${data.borrowAsset},${data.leverageFactor})`).toString('hex')}`,
-        }];
+      case 'leverage': {
+        if (!data.collateralAsset || !data.borrowAsset) {
+          throw new Error('Leverage strategy requires collateralAsset and borrowAsset');
+        }
+        
+        const collateralVault = getVaultAddress(data.collateralAsset as keyof typeof DEVLAND_ADDRESSES.vaults);
+        const borrowVault = getVaultAddress(data.borrowAsset as keyof typeof DEVLAND_ADDRESSES.vaults);
+        const amount = this.parseAmount(data.amount as string | undefined);
+        const leverageFactor = data.leverageFactor || 2;
+        
+        return this.strategies.createLeverageStrategy(
+          collateralVault,
+          borrowVault,
+          amount,
+          leverageFactor
+        );
+      }
       
-      case 'borrow-against-lp':
-        // const lpStrategy = await createLpCollateralizationStrategy(
-        //   data.borrowAsset,
-        //   parseUnits(data.borrowAmount, 18)
-        // );
-        // return lpStrategy.batch;
-        return [{
-          target: '0x0000000000000000000000000000000000000000',
-          value: 0n,
-          calldata: `0x${Buffer.from(`borrowAgainstLP(${data.borrowAsset},${data.borrowAmount})`).toString('hex')}`,
-        }];
-      
-      case 'hedged-lp':
-        // const hedgedStrategy = await createHedgedLpStrategy(
-        //   data.collateralAsset,
-        //   parseUnits(data.collateralAmount, 18),
-        //   data.borrowAsset,
-        //   parseUnits(data.borrowAmount, 18)
-        // );
-        // return hedgedStrategy.batch;
-        return [{
-          target: '0x0000000000000000000000000000000000000000',
-          value: 0n,
-          calldata: `0x${Buffer.from(`hedgedLP(${data.collateralAsset},${data.borrowAsset})`).toString('hex')}`,
-        }];
-      
-      case 'jit-liquidity':
-        // if (data.jitAction === 'deploy') {
-        //   const jitDeployStrategy = await createJitDepositStrategy(
-        //     poolAddress,
-        //     data.jitAsset,
-        //     parseUnits(data.jitAmount, 18)
-        //   );
-        //   return jitDeployStrategy.batch;
-        // } else {
-        //   const jitWithdrawStrategy = await createJitWithdrawalStrategy(
-        //     poolAddress,
-        //     data.jitAsset,
-        //     parseUnits(data.jitAmount, 18)
-        //   );
-        //   return jitWithdrawStrategy.batch;
-        // }
-        return [{
-          target: '0x0000000000000000000000000000000000000000',
-          value: 0n,
-          calldata: `0x${Buffer.from(`jitLiquidity(${data.jitAsset},${data.jitAmount},${data.jitAction})`).toString('hex')}`,
-        }];
+      case 'borrow-against-lp': {
+        if (!data.collateralAsset || !data.borrowAsset) {
+          throw new Error('Borrow against LP strategy requires collateralAsset and borrowAsset');
+        }
+        
+        const lpVault = getVaultAddress(data.collateralAsset as keyof typeof DEVLAND_ADDRESSES.vaults);
+        const borrowVault = getVaultAddress(data.borrowAsset as keyof typeof DEVLAND_ADDRESSES.vaults);
+        const borrowAmount = this.parseAmount(data.borrowAmount);
+        
+        return this.strategies.createLpCollateralizationStrategy(
+          lpVault,
+          borrowVault,
+          borrowAmount
+        );
+      }
       
       default:
+        console.warn(`Strategy type not implemented: ${data.strategyType}`);
         return [];
     }
   }
 
   private static async handleLpToolkit(data: LpToolkitNodeData): Promise<BatchOperation[]> {
-    switch (data.action) {
-      case 'create-pool':
-        // Call EulerSwap factory to create pool
-        return [{
-          target: '0x55d09f01fBF9D8D891c6608C5a54EA7AD6d528fb', // EulerSwap Factory
-          value: 0n,
-          calldata: `0x${Buffer.from(`createPool(${data.vault0},${data.vault1},${data.fee})`).toString('hex')}`,
-        }];
+    console.log(`🌊 LP toolkit action not yet implemented: ${data.action}`);
+    return [];
+  }
+
+  // Helper to parse amount strings (enhanced)
+  private static parseAmount(amount?: string): bigint {
+    if (!amount) {
+      console.warn('No amount provided, defaulting to 0');
+      return 0n;
+    }
+    
+    try {
+      // Remove any whitespace
+      const cleanAmount = amount.trim();
       
-      case 'add-liquidity':
-        // Add liquidity to existing pool
-        return [{
-          target: data.poolAddress!,
-          value: 0n,
-          calldata: `0x${Buffer.from(`addLiquidity(${data.amount0},${data.amount1})`).toString('hex')}`,
-        }];
+      // Handle percentage amounts (e.g., "50%")
+      if (cleanAmount.endsWith('%')) {
+        console.warn('Percentage amounts not yet implemented, defaulting to 1000');
+        return BigInt(1000 * 1e18); // Default for testing
+      }
       
-      case 'remove-liquidity':
-        // Remove liquidity from pool
-        return [{
-          target: data.poolAddress!,
-          value: 0n,
-          calldata: `0x${Buffer.from(`removeLiquidity(${data.amount0},${data.amount1})`).toString('hex')}`,
-        }];
+      // Handle decimal amounts - convert to wei (assuming 18 decimals)
+      const num = parseFloat(cleanAmount);
+      if (isNaN(num)) {
+        console.error('Invalid amount format:', amount);
+        return 0n;
+      }
       
-      default:
-        return [];
+      return BigInt(Math.floor(num * 1e18));
+    } catch (error) {
+      console.error('Failed to parse amount:', amount, error);
+      return 0n;
     }
   }
 }

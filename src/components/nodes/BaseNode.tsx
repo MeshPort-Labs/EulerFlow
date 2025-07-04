@@ -40,8 +40,6 @@ export const BaseNode: React.FC<BaseNodeProps> = ({ data, selected, children, on
           {children}
         </div>
       </div>
-      <>{ console.log('selected:', selected) }</>
-      <>{ console.log('onDelete:', onDelete) }</>
 
       {/* Delete button - appears on hover or selection */}
       {(selected) && deleteHandler && (
