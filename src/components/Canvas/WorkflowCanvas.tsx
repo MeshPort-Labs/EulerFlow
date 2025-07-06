@@ -37,46 +37,279 @@ const convertToReactFlowEdge = (edge: WorkflowEdge): Edge => ({
   targetHandle: edge.targetHandle,
 });
 
-const initialNodes: WorkflowNode[] = [
-  {
-    id: '1',
-    type: 'startNode',
-    position: { x: 100, y: 100 },
-    data: {
-      label: 'Start',
-      category: 'control' as const,
-      controlType: 'start' as const
+const demoTradingWorkflow = {
+  initialNodes: [
+    {
+      id: '1',
+      type: 'startNode',
+      position: { x: 50, y: 150 },
+      data: {
+        label: 'Start Trading',
+        category: 'control' as const,
+        controlType: 'start' as const
+      },
     },
-  },
-  {
-    id: '2',
-    type: 'coreActionNode',
-    position: { x: 300, y: 100 },
-    data: {
-      label: 'Borrow 100 USDC', // Start with smaller amount
-      category: 'core' as const,
-      action: 'borrow' as const,
-      description: 'Borrow USDC against WETH collateral',
-      amount: '100',        // Smaller amount
-      vaultAddress: 'USDC'  
+    {
+      id: '2',
+      type: 'coreActionNode',
+      position: { x: 180, y: 100 },
+      data: {
+        label: 'Withdraw 10 WETH',
+        category: 'core' as const,
+        action: 'withdraw' as const,
+        description: 'Get WETH for trading',
+        amount: '10',
+        vaultAddress: 'WETH'
+      },
     },
-  },
-  {
-    id: '3',
-    type: 'endNode',
-    position: { x: 500, y: 100 },
-    data: {
-      label: 'End',
-      category: 'control' as const,
-      controlType: 'end' as const
+    {
+      id: '3',
+      type: 'coreActionNode',
+      position: { x: 320, y: 100 },
+      data: {
+        label: 'Swap WETH → USDC',
+        category: 'core' as const,
+        action: 'swap' as const,
+        description: 'Convert to stablecoin',
+        tokenIn: 'WETH',
+        tokenOut: 'USDC',
+        amount: '10',
+        slippage: 0.5
+      },
     },
-  },
-];
+    {
+      id: '4',
+      type: 'coreActionNode',
+      position: { x: 460, y: 100 },
+      data: {
+        label: 'Supply USDC',
+        category: 'core' as const,
+        action: 'supply' as const,
+        description: 'Earn yield on USDC',
+        amount: '25000',
+        vaultAddress: 'USDC'
+      },
+    },
+    {
+      id: '5',
+      type: 'coreActionNode',
+      position: { x: 180, y: 200 },
+      data: {
+        label: 'Setup Permissions',
+        category: 'core' as const,
+        action: 'permissions' as const,
+        description: 'Enable USDC controller',
+        controller: 'USDC'
+      },
+    },
+    {
+      id: '6',
+      type: 'coreActionNode',
+      position: { x: 320, y: 200 },
+      data: {
+        label: 'Withdraw 5000 USDC',
+        category: 'core' as const,
+        action: 'withdraw' as const,
+        description: 'Take some profits',
+        amount: '5000',
+        vaultAddress: 'USDC'
+      },
+    },
+    {
+      id: '7',
+      type: 'endNode',
+      position: { x: 600, y: 150 },
+      data: {
+        label: 'Strategy Complete',
+        category: 'control' as const,
+        controlType: 'end' as const
+      },
+    },
+  ],
+  initialEdges: [
+    { id: 'e1-2', source: '1', target: '2' },
+    { id: 'e1-5', source: '1', target: '5' },
+    { id: 'e2-3', source: '2', target: '3' },
+    { id: 'e3-4', source: '3', target: '4' },
+    { id: 'e5-6', source: '5', target: '6' },
+    { id: 'e4-7', source: '4', target: '7' },
+    { id: 'e6-7', source: '6', target: '7' },
+  ]
+};
 
-const initialEdges: WorkflowEdge[] = [
-  { id: 'e1-2', source: '1', target: '2' },
-  { id: 'e2-3', source: '2', target: '3' },
-];
+// const initialNodes = demoTradingWorkflow.initialNodes;
+// const initialEdges = demoTradingWorkflow.initialEdges;
+
+const ultimatePortfolioWorkflow = {
+  initialNodes: [
+    {
+      id: '1',
+      type: 'startNode',
+      position: { x: 50, y: 250 },
+      data: {
+        label: 'Portfolio Start',
+        category: 'control' as const,
+        controlType: 'start' as const
+      },
+    },
+    // Initial diversification
+    {
+      id: '2',
+      type: 'coreActionNode',
+      position: { x: 200, y: 150 },
+      data: {
+        label: 'Supply 80 WETH',
+        category: 'core' as const,
+        action: 'supply' as const,
+        description: 'Primary collateral',
+        amount: '80',
+        vaultAddress: 'WETH'
+      },
+    },
+    {
+      id: '3',
+      type: 'coreActionNode',
+      position: { x: 200, y: 300 },
+      data: {
+        label: 'Supply 10000 USDC',
+        category: 'core' as const,
+        action: 'supply' as const,
+        description: 'Stablecoin base',
+        amount: '10000',
+        vaultAddress: 'USDC'
+      },
+    },
+    // Permission setup
+    {
+      id: '4',
+      type: 'coreActionNode',
+      position: { x: 350, y: 225 },
+      data: {
+        label: 'Enable USDC Controller',
+        category: 'core' as const,
+        action: 'permissions' as const,
+        description: 'Setup borrowing capabilities',
+        controller: 'USDC'
+      },
+    },
+    // Active management - WETH rebalancing
+    {
+      id: '5',
+      type: 'coreActionNode',
+      position: { x: 500, y: 100 },
+      data: {
+        label: 'Withdraw 15 WETH',
+        category: 'core' as const,
+        action: 'withdraw' as const,
+        description: 'Rebalance WETH position',
+        amount: '15',
+        vaultAddress: 'WETH'
+      },
+    },
+    {
+      id: '6',
+      type: 'coreActionNode',
+      position: { x: 650, y: 100 },
+      data: {
+        label: 'Swap WETH → USDC',
+        category: 'core' as const,
+        action: 'swap' as const,
+        description: 'Convert to stablecoin',
+        tokenIn: 'WETH',
+        tokenOut: 'USDC',
+        amount: '15',
+        slippage: 0.5
+      },
+    },
+    {
+      id: '7',
+      type: 'coreActionNode',
+      position: { x: 800, y: 100 },
+      data: {
+        label: 'Supply Swapped USDC',
+        category: 'core' as const,
+        action: 'supply' as const,
+        description: 'Reinvest proceeds',
+        amount: '40000',
+        vaultAddress: 'USDC'
+      },
+    },
+    // USDC profit taking
+    {
+      id: '8',
+      type: 'coreActionNode',
+      position: { x: 500, y: 300 },
+      data: {
+        label: 'Withdraw 8000 USDC',
+        category: 'core' as const,
+        action: 'withdraw' as const,
+        description: 'Take USDC profits',
+        amount: '8000',
+        vaultAddress: 'USDC'
+      },
+    },
+    {
+      id: '9',
+      type: 'coreActionNode',
+      position: { x: 650, y: 300 },
+      data: {
+        label: 'Swap USDC → WETH',
+        category: 'core' as const,
+        action: 'swap' as const,
+        description: 'Buy back WETH with profits',
+        tokenIn: 'USDC',
+        tokenOut: 'WETH',
+        amount: '8000',
+        slippage: 0.5
+      },
+    },
+    {
+      id: '10',
+      type: 'coreActionNode',
+      position: { x: 800, y: 300 },
+      data: {
+        label: 'Supply Bought WETH',
+        category: 'core' as const,
+        action: 'supply' as const,
+        description: 'Compound WETH position',
+        amount: '3',
+        vaultAddress: 'WETH'
+      },
+    },
+    {
+      id: '11',
+      type: 'endNode',
+      position: { x: 950, y: 200 },
+      data: {
+        label: 'Portfolio Optimized',
+        category: 'control' as const,
+        controlType: 'end' as const
+      },
+    },
+  ],
+  initialEdges: [
+    // Initial setup
+    { id: 'e1-2', source: '1', target: '2' },
+    { id: 'e1-3', source: '1', target: '3' },
+    // Permissions
+    { id: 'e2-4', source: '2', target: '4' },
+    { id: 'e3-4', source: '3', target: '4' },
+    // WETH rebalancing flow (top branch)
+    { id: 'e4-5', source: '4', target: '5' },
+    { id: 'e5-6', source: '5', target: '6' },
+    { id: 'e6-7', source: '6', target: '7' },
+    // USDC profit taking flow (bottom branch)
+    { id: 'e4-8', source: '4', target: '8' },
+    { id: 'e8-9', source: '8', target: '9' },
+    { id: 'e9-10', source: '9', target: '10' },
+    // Final convergence
+    { id: 'e7-11', source: '7', target: '11' },
+    { id: 'e10-11', source: '10', target: '11' },
+  ]
+};
+
+const initialNodes = ultimatePortfolioWorkflow.initialNodes;
+const initialEdges = ultimatePortfolioWorkflow.initialEdges;
 
 interface WorkflowCanvasProps {
   onWorkflowStateChange?: (nodes: Node[], edges: Edge[]) => void;

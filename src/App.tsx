@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { WorkflowCanvas } from './components/Canvas/WorkflowCanvas';
 import { NodePalette } from './components/NodePalette/NodePalette';
 import { ExecutionDialog } from './components/ExecutionDialog/ExecutionDialog';
@@ -6,7 +6,6 @@ import { WalletModal } from './components/wallet/WalletModal';
 import { ChainSwitcher } from './components/wallet/ChainSwitcher';
 import { Button } from './components/ui/button';
 import { Badge } from './components/ui/badge';
-import { Card, CardContent } from './components/ui/card';
 import { 
   Save, 
   Play, 
@@ -45,27 +44,22 @@ function App() {
     refetch: refetchData 
   } = useEulerData();
 
+  // Workflow validation
+  const isWorkflowValid = useMemo(() => {
+    if (currentNodes.length === 0) return false;
+    const hasStartNode = currentNodes.some(node => node.type === 'startNode');
+    const hasEndNode = currentNodes.some(node => node.type === 'endNode');
+    return hasStartNode && hasEndNode && currentNodes.length > 1;
+  }, [currentNodes]);
+
+  // Handlers
   const handleSaveWorkflow = () => {
     const workflowData = {
       nodes: currentNodes,
       edges: currentEdges,
       timestamp: new Date().toISOString(),
     };
-    
     localStorage.setItem('euler-workflow', JSON.stringify(workflowData));
-    console.log('💾 Workflow saved to localStorage');
-  };
-
-  const debugCurrentNodes = () => {
-    console.log('=== DEBUGGING CURRENT NODES ===');
-    currentNodes.forEach((node, index) => {
-      console.log(`Node ${index}:`, {
-        id: node.id,
-        type: node.type,
-        data: node.data,
-      });
-    });
-    console.log('=== END DEBUG ===');
   };
 
   const handleLoadWorkflow = () => {
@@ -73,8 +67,8 @@ function App() {
       const saved = localStorage.getItem('euler-workflow');
       if (saved) {
         const workflowData = JSON.parse(saved);
-        console.log('📂 Loaded workflow:', workflowData);
         // TODO: Implement workflow loading in canvas
+        console.log('📂 Loaded workflow:', workflowData);
       }
     } catch (error) {
       console.error('Failed to load workflow:', error);
@@ -97,9 +91,6 @@ function App() {
       return;
     }
     
-    console.log('🚀 Opening execution dialog...');
-    console.log('Current nodes:', currentNodes);
-    console.log('Current edges:', currentEdges);
     setIsExecutionDialogOpen(true);
   };
 
@@ -107,227 +98,99 @@ function App() {
     console.log('👀 Previewing workflow:', { nodes: currentNodes, edges: currentEdges });
   };
 
-  // Handle node drag from palette
   const handleNodeDrag = (nodeTemplate: any) => {
     console.log('Node dragged:', nodeTemplate);
   };
 
-  // Handle workflow state change from canvas
   const handleWorkflowStateChange = (nodes: Node[], edges: Edge[]) => {
-    console.log('Workflow state changed:', { nodes: nodes.length, edges: edges.length });
     setCurrentNodes(nodes);
     setCurrentEdges(edges);
   };
 
-  // Create a simple test workflow for verification
-  const createTestWorkflow = () => {
-    const testNodes: Node[] = [
-      {
-        id: 'start-1',
-        type: 'startNode',
-        position: { x: 100, y: 100 },
-        data: { 
-          label: 'Start', 
-          category: 'control', 
-          controlType: 'start'
-        },
-      },
-      {
-        id: 'supply-1',
-        type: 'coreActionNode',
-        position: { x: 300, y: 100 },
-        data: { 
-          label: 'Supply 1000 USDC', 
-          category: 'core',
-          action: 'supply',
-          vaultAddress: 'USDC',
-          amount: '1000'
-        },
-      },
-      {
-        id: 'end-1',
-        type: 'endNode',
-        position: { x: 500, y: 100 },
-        data: { 
-          label: 'End', 
-          category: 'control', 
-          controlType: 'end'
-        },
-      },
-    ];
-
-    const testEdges: Edge[] = [
-      {
-        id: 'e1-2',
-        source: 'start-1',
-        target: 'supply-1',
-      },
-      {
-        id: 'e2-3',
-        source: 'supply-1',
-        target: 'end-1',
-      },
-    ];
-
-    setCurrentNodes(testNodes);
-    setCurrentEdges(testEdges);
-    console.log('🧪 Created test workflow: Start → Supply 1000 USDC → End');
-  };
-
-  // Add this to your test workflow button handler in App.tsx
-const createDebugWorkflow = () => {
-  const testNodes: Node[] = [
-    {
-      id: 'start-1',
-      type: 'startNode',
-      position: { x: 100, y: 100 },
-      data: { 
-        label: 'Start', 
-        category: 'control', 
-        controlType: 'start'
-      },
-    },
-    {
-      id: 'permissions-1',
-      type: 'coreActionNode',
-      position: { x: 300, y: 100 },
-      data: { 
-        label: 'Enable USDC Controller', 
-        category: 'core',
-        action: 'permissions',
-        controller: 'USDC'
-      },
-    },
-    {
-      id: 'end-1',
-      type: 'endNode',
-      position: { x: 500, y: 100 },
-      data: { 
-        label: 'End', 
-        category: 'control', 
-        controlType: 'end'
-      },
-    },
-  ];
-
-  const testEdges: Edge[] = [
-    { id: 'e1-2', source: 'start-1', target: 'permissions-1' },
-    { id: 'e2-3', source: 'permissions-1', target: 'end-1' },
-  ];
-
-  setCurrentNodes(testNodes);
-  setCurrentEdges(testEdges);
-  console.log('🧪 Created debug workflow: Enable Controller (simpler test)');
-};
-
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
+    <div className="h-screen flex flex-col bg-gray-50 overflow-hidden">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <h1 className="text-2xl font-bold text-gray-900">EulerFlow</h1>
-          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-            Visual Strategy Builder
-          </Badge>
-          
-          {/* Debug Info */}
-          <Badge variant="outline" className="text-xs">
-            Nodes: {currentNodes.length} | Edges: {currentEdges.length}
-          </Badge>
-
-          {/* Data Loading Indicator */}
-          {dataLoading && (
-            <Badge variant="outline" className="text-xs animate-pulse">
-              <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
-              Loading...
+      <header className="flex-shrink-0 bg-white border-b border-gray-200 px-6 py-4">
+        <div className="flex items-center justify-between">
+          {/* Left - Branding & Info */}
+          <div className="flex items-center space-x-4">
+            <h1 className="text-2xl font-bold text-gray-900">EulerFlow</h1>
+            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+              Visual Strategy Builder
             </Badge>
-          )}
-        </div>
-        
-        <div className="flex items-center space-x-4">
-          {/* Chain Switcher */}
-          <ChainSwitcher />
-          
-          {/* Wallet Connection */}
-          <div className="flex items-center space-x-2">
-            <Wallet className="h-4 w-4 text-gray-500" />
-            {wallet.isConnected ? (
-              <div className="flex items-center space-x-2">
-                <Badge variant="default" className="bg-green-100 text-green-800">
-                  Connected
-                </Badge>
-                <span className="text-sm text-gray-600 font-mono">
-                  {wallet.address?.slice(0, 6)}...{wallet.address?.slice(-4)}
-                </span>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={disconnectWallet}
-                >
-                  Disconnect
-                </Button>
-              </div>
-            ) : (
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => connectWallet()}
-              >
-                Connect Wallet
-              </Button>
+            
+            <Badge variant="outline" className="text-xs">
+              Nodes: {currentNodes.length} | Edges: {currentEdges.length}
+            </Badge>
+
+            {dataLoading && (
+              <Badge variant="outline" className="text-xs animate-pulse">
+                <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
+                Loading...
+              </Badge>
             )}
           </div>
-
-          {/* Action Buttons */}
-          <div className="flex items-center space-x-2 border-l border-gray-200 pl-4">
-            <Button variant="outline" size="sm" onClick={createDebugWorkflow}>
-              <Activity className="h-4 w-4 mr-2" />
-              Test Workflow
-            </Button>
-
-            <Button variant="outline" size="sm" onClick={refetchData}>
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Refresh
-            </Button>
+          
+          {/* Right - Controls */}
+          <div className="flex items-center space-x-4">
+            <ChainSwitcher />
             
-            <Button variant="outline" size="sm" onClick={handleSaveWorkflow}>
-              <Save className="h-4 w-4 mr-2" />
-              Save
-            </Button>
-            
-            <Button variant="outline" size="sm" onClick={handleLoadWorkflow}>
-              <Upload className="h-4 w-4 mr-2" />
-              Load
-            </Button>
-            
-            <Button variant="outline" size="sm" onClick={handlePreviewWorkflow}>
-              <Eye className="h-4 w-4 mr-2" />
-              Preview
-            </Button>
-            
-            <Button 
-              className="bg-blue-600 hover:bg-blue-700"
-              onClick={handleExecuteWorkflow}
-              disabled={currentNodes.length === 0}
-              title={currentNodes.length === 0 ? 'Add nodes to your workflow first' : 'Execute workflow'}
-            >
-              <Play className="h-4 w-4 mr-2" />
-              Execute Workflow
-              {currentNodes.length === 0 && (
-                <span className="ml-2 text-xs opacity-75">(No nodes)</span>
+            {/* Wallet Section */}
+            <div className="flex items-center space-x-2">
+              <Wallet className="h-4 w-4 text-gray-500" />
+              {wallet.isConnected ? (
+                <div className="flex items-center space-x-2">
+                  <Badge variant="default" className="bg-green-100 text-green-800">
+                    Connected
+                  </Badge>
+                  <span className="text-sm text-gray-600 font-mono">
+                    {wallet.address?.slice(0, 6)}...{wallet.address?.slice(-4)}
+                  </span>
+                  <Button variant="outline" size="sm" onClick={disconnectWallet}>
+                    Disconnect
+                  </Button>
+                </div>
+              ) : (
+                <Button variant="outline" size="sm" onClick={connectWallet}>
+                  Connect Wallet
+                </Button>
               )}
-            </Button>
+            </div>
 
-            <Button variant="outline" size="sm" onClick={debugCurrentNodes}>
-              Debug Nodes
-            </Button>
+            {/* Action Buttons */}
+            <div className="flex items-center space-x-2 border-l border-gray-200 pl-4">
+              <Button variant="outline" size="sm" onClick={handleSaveWorkflow}>
+                <Save className="h-4 w-4 mr-2" />
+                Save
+              </Button>
+              
+              <Button variant="outline" size="sm" onClick={handleLoadWorkflow}>
+                <Upload className="h-4 w-4 mr-2" />
+                Load
+              </Button>
+              
+              <Button variant="outline" size="sm" onClick={handlePreviewWorkflow}>
+                <Eye className="h-4 w-4 mr-2" />
+                Preview
+              </Button>
+              
+              <Button 
+                className="bg-blue-600 hover:bg-blue-700"
+                onClick={handleExecuteWorkflow}
+                disabled={!isWorkflowValid}
+                title={!isWorkflowValid ? 'Add nodes to create a valid workflow first' : 'Execute workflow'}
+              >
+                <Play className="h-4 w-4 mr-2" />
+                Execute
+              </Button>
+            </div>
           </div>
         </div>
       </header>
 
       {/* Network Warning Banner */}
       {wallet.isConnected && !wallet.isCorrectChain && (
-        <div className="bg-yellow-50 border-b border-yellow-200 px-6 py-3">
+        <div className="flex-shrink-0 bg-yellow-50 border-b border-yellow-200 px-6 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <AlertTriangle className="h-5 w-5 text-yellow-600" />
@@ -344,7 +207,7 @@ const createDebugWorkflow = () => {
 
       {/* Euler Data Status */}
       {wallet.isConnected && wallet.isCorrectChain && (
-        <div className="bg-blue-50 border-b border-blue-200 px-6 py-3">
+        <div className="flex-shrink-0 bg-blue-50 border-b border-blue-200 px-6 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
@@ -361,7 +224,6 @@ const createDebugWorkflow = () => {
                 ))}
               </div>
 
-              {/* User Pool Status */}
               <Badge 
                 variant="outline" 
                 className={`text-xs ${userPool ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}
@@ -386,15 +248,15 @@ const createDebugWorkflow = () => {
         </div>
       )}
 
-      {/* Main Content */}
-      <div className="flex-1 flex">
-        {/* Node Palette */}
-        <aside className="w-80 bg-white border-r border-gray-200 overflow-y-auto">
+      {/* Main Content - Takes remaining height */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Node Palette - Fixed width */}
+        <aside className="w-80 bg-white border-r border-gray-200 overflow-y-auto flex-shrink-0">
           <NodePalette onNodeDrag={handleNodeDrag} />
         </aside>
 
-        {/* Canvas */}
-        <main className="flex-1 relative">
+        {/* Canvas - Takes remaining width, includes StatusBar at bottom */}
+        <main className="flex-1 relative overflow-hidden">
           <WorkflowCanvas 
             onWorkflowStateChange={handleWorkflowStateChange}
           />
