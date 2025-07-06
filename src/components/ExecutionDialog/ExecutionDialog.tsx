@@ -242,7 +242,6 @@ export const ExecutionDialog: React.FC<ExecutionDialogProps> = ({
                   <CardContent>
                     <ScrollArea className="h-48">
                       <div className="space-y-3">
-                        <>{console.log("executionSteps", executionSteps)}</>
                         {executionSteps.map((step, index) => {
                           const node = nodes.find(n => n.id === step.nodeId);
                           return (

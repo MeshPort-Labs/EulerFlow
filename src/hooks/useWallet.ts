@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAccount, useConnect, useDisconnect, useChainId, useSwitchChain } from 'wagmi';
 import { devlandChain } from '../lib/wallet/config';
+import { toast } from 'sonner';
 
 export const useWallet = () => {
   const { address, isConnected } = useAccount();
@@ -25,8 +26,15 @@ export const useWallet = () => {
         try {
           await connect({ connector });
           setIsWalletModalOpen(false);
+          toast.success('Wallet connected successfully! 🎉', {
+            description: `Connected with ${connector.name}`
+          });
         } catch (error) {
           console.error('Failed to connect wallet:', error);
+          toast.error('Failed to connect wallet', {
+            description: error instanceof Error ? error.message : 'Unknown error'
+          });
+  
           throw error;
         }
       }
@@ -38,6 +46,9 @@ export const useWallet = () => {
 
   const disconnectWallet = () => {
     disconnect();
+    toast.info('Wallet disconnected', {
+      description: 'You can reconnect anytime'
+    });
     console.log('🔌 Wallet disconnected');
   };
 

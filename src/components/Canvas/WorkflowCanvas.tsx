@@ -42,86 +42,40 @@ const initialNodes: WorkflowNode[] = [
     id: '1',
     type: 'startNode',
     position: { x: 100, y: 100 },
-    data: { 
-      label: 'Start', 
-      category: 'control' as const, 
-      controlType: 'start' as const 
+    data: {
+      label: 'Start',
+      category: 'control' as const,
+      controlType: 'start' as const
     },
   },
   {
     id: '2',
     type: 'coreActionNode',
-    position: { x: 400, y: 10 },
-    data: { 
-      label: 'Supply USDC', 
+    position: { x: 300, y: 100 },
+    data: {
+      label: 'Borrow 100 USDC', // Start with smaller amount
       category: 'core' as const,
-      action: 'supply' as const,
-      description: 'Supply USDC to vault',
-      amount: '1000',
-      vaultAddress: '0x1234...5678'
+      action: 'borrow' as const,
+      description: 'Borrow USDC against WETH collateral',
+      amount: '100',        // Smaller amount
+      vaultAddress: 'USDC'  
     },
   },
   {
     id: '3',
-    type: 'strategyNode',
-    position: { x: 800, y: 5 },
-    data: { 
-      label: '3x Leverage WETH', 
-      category: 'strategy' as const,
-      strategyType: 'leverage' as const,
-      description: 'Build 3x leveraged WETH position',
-      collateralAsset: 'WETH',
-      borrowAsset: 'USDC',
-      leverageFactor: 3
-    },
-  },
-  {
-    id: '4',
-    type: 'lpToolkitNode',
-    position: { x: 800, y: 400 },
-    data: { 
-      label: 'Create USDC/WETH Pool', 
-      category: 'lp-toolkit' as const,
-      action: 'create-pool' as const,
-      description: 'Create new liquidity pool',
-      vault0: '0x1234...5678',
-      vault1: '0x2345...6789',
-      fee: '0.3'
-    },
-  },
-  {
-    id: '5',
     type: 'endNode',
-    position: { x: 1200, y: 150 },
-    data: { 
-      label: 'End', 
-      category: 'control' as const, 
-      controlType: 'end' as const 
+    position: { x: 500, y: 100 },
+    data: {
+      label: 'End',
+      category: 'control' as const,
+      controlType: 'end' as const
     },
   },
 ];
 
 const initialEdges: WorkflowEdge[] = [
-  {
-    id: 'e1-2',
-    source: '1',
-    target: '2',
-  },
-  {
-    id: 'e2-3',
-    source: '2',
-    target: '3',
-  },
-  {
-    id: 'e3-5',
-    source: '3',
-    target: '5',
-  },
-  {
-    id: 'e2-4',
-    source: '2',
-    target: '4',
-  },
+  { id: 'e1-2', source: '1', target: '2' },
+  { id: 'e2-3', source: '2', target: '3' },
 ];
 
 interface WorkflowCanvasProps {

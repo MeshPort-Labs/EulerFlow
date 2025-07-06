@@ -22,7 +22,6 @@ export const MinimalNode: React.FC<MinimalNodeProps> = ({
   onDelete 
 }) => {
   const nodeData = data as NodeData;
-  console.log("nodeData", nodeData);
   const status = config.getStatus(nodeData);
 
   return (
